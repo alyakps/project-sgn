@@ -2,7 +2,6 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import Image from "next/image";
 
 export default function DashboardPage() {
   const employeeName = "Andrian Tambunan";
@@ -14,16 +13,11 @@ export default function DashboardPage() {
       {/* === HEADER UNGU === */}
       <Card className="relative w-full overflow-hidden rounded-2xl border-0 shadow-xl bg-gradient-to-r from-violet-600 to-violet-500 text-white">
         <CardContent className="p-6 sm:p-8 flex flex-col justify-center relative">
-          {/* Label kecil */}
-          <p className="text-[10px] uppercase tracking-widest font-semibold text-violet-200 mb-1">
-            Project
-          </p>
-
           {/* Title besar */}
           <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
 
-          {/* Avatar kecil di pojok kanan atas */}
-          <Avatar className="absolute top-4 right-4 h-10 w-10 ring-2 ring-white/70 shadow-lg">
+          {/* ✅ Avatar kecil naik dan agak ke kiri */}
+          <Avatar className="absolute -top-3 right-4 h-10 w-10 ring-2 ring-white/70 shadow-lg">
             <AvatarImage src="/avatar.png" alt="User" />
             <AvatarFallback>AT</AvatarFallback>
           </Avatar>

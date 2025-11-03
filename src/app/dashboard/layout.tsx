@@ -35,27 +35,29 @@ export default function DashboardLayout({
             <div className="flex flex-col gap-6">
               {/* PROJECT title */}
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-yellow-500">
+                <div className="text-[20px] font-semibold uppercase tracking-wide text-yellow-500">
                   Project
                 </div>
               </div>
 
               {/* OVERVIEW */}
               <div className="flex flex-col gap-2">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-900">
+                <div className="text-[21px] font-semibold uppercase tracking-wide text-zinc-900">
                   Overview
                 </div>
 
                 <SidebarItem
                   href="/dashboard/hard"
                   label="Hard Competency"
-                  active={pathname === "/dashboard/hard"}
+                  active={pathname === "/dashboard/hard/page"}
+                  fontSize="text-[19px]"
                 />
 
                 <SidebarItem
                   href="/dashboard/soft"
                   label="Soft Competency"
-                  active={pathname === "/dashboard/soft"}
+                  active={pathname === "/dashboard/soft/page"}
+                  fontSize="text-[19px]"
                 />
               </div>
             </div>
@@ -63,7 +65,7 @@ export default function DashboardLayout({
             {/* SETTINGS + Footer */}
             <div className="flex flex-col gap-4 mt-8 border-t border-zinc-200 pt-4">
               <div className="flex flex-col gap-2">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-900">
+                <div className="text-[21px] font-semibold uppercase tracking-wide text-zinc-900">
                   Settings
                 </div>
 
@@ -71,21 +73,16 @@ export default function DashboardLayout({
                   href="/dashboard/profile"
                   label="Profile"
                   active={pathname === "/dashboard/profile"}
+                  fontSize="text-[19px]"
                 />
 
+                {/* ✅ Logout tanpa bulatan & non-bold */}
                 <button
                   onClick={() => router.push("/")}
-                  className="flex items-start gap-2 text-[11px] leading-[1.2] cursor-pointer text-zinc-700 hover:text-[#05398f] transition"
+                  className="text-[19px] px-3 py-2 rounded-md text-[#05398f] transition-all duration-200 hover:bg-[#05398f] hover:text-white text-left font-normal"
                 >
-                  <span className="mt-[2px] text-zinc-500">
-                    <span className="inline-block h-2 w-2 rounded-full border border-current" />
-                  </span>
-                  <span className="whitespace-nowrap">Logout</span>
+                  Logout
                 </button>
-              </div>
-
-              <div className="text-[10px] text-zinc-400">
-                © {new Date().getFullYear()} Company
               </div>
             </div>
           </CardContent>
@@ -107,16 +104,18 @@ function SidebarItem({
   href,
   label,
   active,
+  fontSize = "text-[11px]",
 }: {
   href: string;
   label: string;
   active: boolean;
+  fontSize?: string;
 }) {
   return (
     <Link
       href={href}
       className={[
-        "flex items-start gap-2 text-[11px] leading-[1.2] cursor-pointer transition",
+        `flex items-start gap-2 ${fontSize} leading-[1.2] cursor-pointer transition-all duration-200`,
         active
           ? "bg-[#05398f] text-white px-3 py-2 rounded-md font-semibold shadow-sm"
           : "text-[#05398f] hover:bg-[#05398f] hover:text-white px-3 py-2 rounded-md",
