@@ -1,3 +1,4 @@
+// src/app/dashboard/hard/page.tsx
 "use client";
 
 import * as React from "react";
@@ -63,23 +64,18 @@ const DATA: Row[] = [
 ];
 
 export default function HardCompetencyPage() {
-  // 🔹 Simpan banyak ID yang sedang terbuka
   const [expandedIds, setExpandedIds] = React.useState<string[]>([]);
-
-  const toggleDetail = (id: string) => {
-    setExpandedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
+  const toggleDetail = (id: string) =>
+    setExpandedIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
 
   return (
-    <div className="flex flex-col gap-6">
-      <Card className="bg-white/90 backdrop-blur-sm border border-zinc-200 shadow-xl rounded-2xl">
+    // ⬇️ Tambah padding kiri khusus mobile agar tidak ketimpa sidebar (w-16 = 64px → pakai ~80px dengan sedikit jarak)
+    <div className="pl-20 md:pl-0 pr-2 md:pr-0 flex flex-col gap-6 min-w-0">
+      <Card className="bg-white border border-zinc-200 shadow-xl rounded-2xl">
         <CardContent className="p-6">
-          <h2 className="text-xl font-semibold text-zinc-900 mb-5">
-            Hard Competency
-          </h2>
+          <h2 className="text-xl font-semibold text-zinc-900 mb-5">Hard Competency</h2>
 
+          {/* scroll horizontal hanya di dalam tabel */}
           <div className="w-full overflow-x-auto">
             <table className="w-full table-fixed text-[16px]">
               <colgroup>
@@ -105,19 +101,11 @@ export default function HardCompetencyPage() {
                   <React.Fragment key={r.id}>
                     <tr
                       className={`border-b border-zinc-100 transition ${
-                        expandedIds.includes(r.id)
-                          ? "bg-zinc-50"
-                          : "hover:bg-zinc-50"
+                        expandedIds.includes(r.id) ? "bg-zinc-50" : "hover:bg-zinc-50"
                       }`}
                     >
-                      <td className="py-3 text-zinc-700 text-center font-medium">
-                        {i + 1}
-                      </td>
-
-                      <td className="py-3 text-zinc-900 font-semibold">
-                        {r.nama}
-                      </td>
-
+                      <td className="py-3 text-zinc-700 text-center font-medium">{i + 1}</td>
+                      <td className="py-3 text-zinc-900 font-semibold">{r.nama}</td>
                       <td className="py-3 text-center">
                         <div className="flex justify-center">
                           <span
@@ -132,11 +120,9 @@ export default function HardCompetencyPage() {
                           </span>
                         </div>
                       </td>
-
                       <td className="py-3 text-zinc-900 text-center font-medium">
                         {r.nilai ?? "-"}
                       </td>
-
                       <td className="py-3 text-center">
                         <Button
                           size="sm"
@@ -160,20 +146,12 @@ export default function HardCompetencyPage() {
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-3 text-[16px]">
                                 <div className="space-y-2">
                                   <div>
-                                    <p className="text-sm text-zinc-500 font-medium">
-                                      ID
-                                    </p>
-                                    <p className="text-zinc-900 font-semibold">
-                                      {r.id}
-                                    </p>
+                                    <p className="text-sm text-zinc-500 font-medium">ID</p>
+                                    <p className="text-zinc-900 font-semibold">{r.id}</p>
                                   </div>
                                   <div>
-                                    <p className="text-sm text-zinc-500 font-medium">
-                                      Kode
-                                    </p>
-                                    <p className="text-zinc-900 font-semibold">
-                                      {r.kode}
-                                    </p>
+                                    <p className="text-sm text-zinc-500 font-medium">Kode</p>
+                                    <p className="text-zinc-900 font-semibold">{r.kode}</p>
                                   </div>
                                 </div>
 
@@ -182,17 +160,13 @@ export default function HardCompetencyPage() {
                                     <p className="text-sm text-zinc-500 font-medium">
                                       Job Family Kompetensi
                                     </p>
-                                    <p className="text-zinc-900 font-semibold">
-                                      {r.jobFamily}
-                                    </p>
+                                    <p className="text-zinc-900 font-semibold">{r.jobFamily}</p>
                                   </div>
                                   <div>
                                     <p className="text-sm text-zinc-500 font-medium">
                                       Sub Job Family Kompetensi
                                     </p>
-                                    <p className="text-zinc-900 font-semibold">
-                                      {r.subJob}
-                                    </p>
+                                    <p className="text-zinc-900 font-semibold">{r.subJob}</p>
                                   </div>
                                 </div>
                               </div>

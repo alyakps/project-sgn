@@ -133,7 +133,7 @@ export default function SoftCompetencyPage() {
       <Card>
         <CardContent className="p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-zinc-900 mb-4">
-            Daftar Kompetensi (17)
+            Daftar Kompetensi
           </h3>
 
           <div className="w-full overflow-x-auto">

@@ -1,7 +1,22 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import {
+  LayoutDashboard,
+  LineChart,
+  BarChart,
+  User,
+  LogOut,
+} from "lucide-react";
 
 export default function DashboardLayout({
   children,
@@ -15,72 +30,101 @@ export default function DashboardLayout({
     pathname === base || pathname.startsWith(base + "/");
 
   return (
-    <div className="min-h-screen w-full bg-zinc-50">
-      <div className="flex min-h-screen">
-        {/* === SIDEBAR === */}
-        <aside className="w-64 shrink-0 bg-white border-r border-zinc-200 p-4">
-          <div className="flex h-full flex-col">
-            {/* PROJECT */}
-            <div className="text-[20px] font-semibold uppercase tracking-wide text-yellow-500">
+    // body wrapper: full height, cegah scroll horizontal
+    <div className="h-screen w-full bg-zinc-50 overflow-hidden">
+      <TooltipProvider delayDuration={100}>
+        {/* === FIXED SIDEBAR === */}
+        <aside
+          className={[
+            "fixed inset-y-0 left-0 z-40",
+            "w-16 md:w-64",
+            "border-r border-zinc-200 bg-white",
+            "p-2 md:p-4",
+            "flex flex-col",
+          ].join(" ")}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-center md:justify-start mb-3 md:mb-6">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-yellow-400 text-zinc-900 font-bold md:hidden">
+              P
+            </div>
+            <div className="hidden md:block text-xl font-semibold uppercase tracking-wide text-yellow-500">
               Project
             </div>
+          </div>
 
-            {/* DASHBOARD */}
-            <div className="mt-4">
-              <SidebarItem
-                href="/dashboard"
-                label="Dashboard"
-                active={pathname === "/dashboard"}
-                fontSize="text-[19px]"
-              />
+          {/* Items (pakai flex-1 supaya footer selalu nempel bawah) */}
+          <div className="flex-1 flex flex-col gap-2 md:gap-3 overflow-hidden">
+            <SidebarItem
+              href="/dashboard"
+              label="Dashboard"
+              active={isActive("/dashboard") && pathname === "/dashboard"}
+              icon={<LayoutDashboard className="h-5 w-5" />}
+            />
+
+            <div className="hidden md:block text-[21px] font-semibold uppercase tracking-wide text-zinc-900 mt-1">
+              Overview
             </div>
 
-            {/* OVERVIEW */}
-            <div className="flex flex-col gap-2 mt-6">
-              <div className="text-[21px] font-semibold uppercase tracking-wide text-zinc-900">
-                Overview
-              </div>
+            <SidebarItem
+              href="/dashboard/hard"
+              label="Hard Competency"
+              active={isActive("/dashboard/hard")}
+              icon={<BarChart className="h-5 w-5" />}
+            />
+            <SidebarItem
+              href="/dashboard/soft"
+              label="Soft Competency"
+              active={isActive("/dashboard/soft")}
+              icon={<LineChart className="h-5 w-5" />}
+            />
+          </div>
 
-              <SidebarItem
-                href="/dashboard/hard"
-                label="Hard Competency"
-                active={isActive("/dashboard/hard")}
-                fontSize="text-[19px]"
-              />
-              <SidebarItem
-                href="/dashboard/soft"
-                label="Soft Competency"
-                active={isActive("/dashboard/soft")}
-                fontSize="text-[19px]"
-              />
+          {/* Footer / Settings SELALU di bawah sidebar, tetap kelihatan */}
+          <div className="pt-3 md:pt-4 border-t border-zinc-200">
+            <div className="hidden md:block text-[21px] font-semibold uppercase tracking-wide text-zinc-900 mb-2">
+              Settings
             </div>
 
-            {/* SETTINGS */}
-            <div className="mt-8 border-t border-zinc-200 pt-4 flex flex-col gap-2">
-              <div className="text-[21px] font-semibold uppercase tracking-wide text-zinc-900">
-                Settings
-              </div>
+            <SidebarItem
+              href="/dashboard/profile"
+              label="Profile"
+              active={isActive("/dashboard/profile")}
+              icon={<User className="h-5 w-5" />}
+            />
 
-              <SidebarItem
-                href="/dashboard/profile"
-                label="Profile"
-                active={isActive("/dashboard/profile")}
-                fontSize="text-[19px]"
-              />
+            {/* Logout (ikon saat compact) */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden h-10 w-10 text-[#05398f]"
+                  onClick={() => router.push("/")}
+                >
+                  <LogOut className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Logout</TooltipContent>
+            </Tooltip>
 
-              <button
-                onClick={() => router.push("/")}
-                className="text-[19px] px-3 py-2 rounded-md text-[#05398f] transition-all duration-200 hover:bg-[#05398f] hover:text-white text-left font-normal"
-              >
-                Logout
-              </button>
-            </div>
+            {/* Logout (teks saat lebar) */}
+            <Button
+              onClick={() => router.push("/")}
+              className="hidden md:flex items-center justify-start gap-2 text-[19px] text-[#05398f] hover:bg-[#05398f] hover:text-white"
+              variant="ghost"
+            >
+              <LogOut className="h-5 w-5" />
+              Logout
+            </Button>
           </div>
         </aside>
 
-        {/* === MAIN === */}
-        <main className="flex-1 bg-white p-6 sm:p-8">{children}</main>
-      </div>
+        {/* === MAIN: digeser sesuai lebar sidebar, hanya main yang scroll === */}
+        <main className="h-screen ml-16 md:ml-64 overflow-y-auto bg-white p-4 sm:p-6 md:p-8">
+          {children}
+        </main>
+      </TooltipProvider>
     </div>
   );
 }
@@ -90,24 +134,36 @@ function SidebarItem({
   href,
   label,
   active,
-  fontSize = "text-[11px]",
+  icon,
 }: {
   href: string;
   label: string;
   active: boolean;
-  fontSize?: string;
+  icon: React.ReactNode;
 }) {
   return (
-    <Link
-      href={href}
-      className={[
-        `flex items-start gap-2 ${fontSize} leading-[1.2] cursor-pointer transition-all duration-200`,
-        active
-          ? "bg-[#05398f] text-white px-3 py-2 rounded-md font-semibold shadow-sm"
-          : "text-[#05398f] hover:bg-[#05398f] hover:text-white px-3 py-2 rounded-md",
-      ].join(" ")}
-    >
-      <span className="whitespace-nowrap">{label}</span>
-    </Link>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link href={href}>
+          <Button
+            variant={active ? "default" : "ghost"}
+            className={[
+              "w-full flex items-center justify-center md:justify-start gap-2",
+              "rounded-md transition-all duration-200",
+              active
+                ? "bg-[#05398f] text-white hover:bg-[#042E71]"
+                : "text-[#05398f] hover:bg-[#05398f] hover:text-white",
+              "h-10 md:h-auto md:px-3 md:py-2",
+            ].join(" ")}
+          >
+            {icon}
+            <span className="hidden md:inline text-[17px] font-semibold">
+              {label}
+            </span>
+          </Button>
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
   );
 }
