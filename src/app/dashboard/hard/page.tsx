@@ -10,47 +10,93 @@ type Row = {
   nama: string;
   jobFamily: string;
   subJob: string;
-  status: "tercapai" | "tidak tercapai";
+  status: "Tercapai" | "Tidak Tercapai";
   nilai: number | null;
+  deskripsi: string;
 };
 
 const DATA: Row[] = [
-  { id: "4821", kode: "HAK.MAK.008", nama: "Verifikasi Bahan Baku", jobFamily: "Produksi", subJob: "Operator Giling", status: "tercapai", nilai: 92 },
-  { id: "1942", kode: "HAK.MAK.009", nama: "Pengawasan Proses Giling", jobFamily: "Produksi", subJob: "Operator Giling", status: "tidak tercapai", nilai: 61 },
-  { id: "2873", kode: "TEK.MTN.005", nama: "Preventive Maintenance", jobFamily: "Teknik", subJob: "Maintenance", status: "tercapai", nilai: 95 },
-  { id: "5239", kode: "SDM.RKT.004", nama: "Interview Dasar", jobFamily: "SDM", subJob: "Rekrutmen", status: "tidak tercapai", nilai: 39 },
+  {
+    id: "4821",
+    kode: "HAK.MAK.008",
+    nama: "Verifikasi Bahan Baku",
+    jobFamily: "Produksi",
+    subJob: "Operator Giling",
+    status: "Tercapai",
+    nilai: 92,
+    deskripsi:
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+  },
+  {
+    id: "1942",
+    kode: "HAK.MAK.009",
+    nama: "Pengawasan Proses Giling",
+    jobFamily: "Produksi",
+    subJob: "Operator Giling",
+    status: "Tidak Tercapai",
+    nilai: 61,
+    deskripsi:
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip.",
+  },
+  {
+    id: "2873",
+    kode: "TEK.MTN.005",
+    nama: "Preventive Maintenance",
+    jobFamily: "Teknik",
+    subJob: "Maintenance",
+    status: "Tercapai",
+    nilai: 95,
+    deskripsi:
+      "Kegiatan perawatan terjadwal untuk mencegah downtime dan kerusakan peralatan produksi.",
+  },
+  {
+    id: "5239",
+    kode: "SDM.RKT.004",
+    nama: "Interview Dasar",
+    jobFamily: "SDM",
+    subJob: "Rekrutmen",
+    status: "Tidak Tercapai",
+    nilai: 39,
+    deskripsi:
+      "Wawancara tahap awal untuk menilai kesesuaian umum kandidat terhadap kriteria dasar pekerjaan.",
+  },
 ];
 
 export default function HardCompetencyPage() {
-  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  // 🔹 Simpan banyak ID yang sedang terbuka
+  const [expandedIds, setExpandedIds] = React.useState<string[]>([]);
 
   const toggleDetail = (id: string) => {
-    setExpandedId((curr) => (curr === id ? null : id));
+    setExpandedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   return (
     <div className="flex flex-col gap-6">
       <Card className="bg-white/90 backdrop-blur-sm border border-zinc-200 shadow-xl rounded-2xl">
         <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-zinc-900 mb-4">Hard Competency</h2>
+          <h2 className="text-xl font-semibold text-zinc-900 mb-5">
+            Hard Competency
+          </h2>
 
           <div className="w-full overflow-x-auto">
-            <table className="w-full table-fixed">
+            <table className="w-full table-fixed text-[16px]">
               <colgroup>
                 <col className="w-12" />
                 <col />
-                <col className="w-32" />
-                <col className="w-24" />
+                <col className="w-36" />
                 <col className="w-28" />
+                <col className="w-32" />
               </colgroup>
 
               <thead>
-                <tr className="text-left text-[13px] text-zinc-600 border-b border-zinc-200">
-                  <th className="py-2">No</th>
-                  <th className="py-2">Nama Kompetensi</th>
-                  <th className="py-2">Status</th>
-                  <th className="py-2">Nilai</th>
-                  <th className="py-2 text-center">Detail</th>
+                <tr className="text-[17px] font-semibold text-zinc-700 border-b border-zinc-200">
+                  <th className="py-3 text-center">No</th>
+                  <th className="py-3 text-left">Nama Kompetensi</th>
+                  <th className="py-3 text-center">Status</th>
+                  <th className="py-3 text-center">Nilai</th>
+                  <th className="py-3 text-center">Detail</th>
                 </tr>
               </thead>
 
@@ -58,68 +104,106 @@ export default function HardCompetencyPage() {
                 {DATA.map((r, i) => (
                   <React.Fragment key={r.id}>
                     <tr
-                      className={`border-b border-zinc-100 ${
-                        expandedId === r.id ? "bg-zinc-50" : "hover:bg-zinc-50"
+                      className={`border-b border-zinc-100 transition ${
+                        expandedIds.includes(r.id)
+                          ? "bg-zinc-50"
+                          : "hover:bg-zinc-50"
                       }`}
                     >
-                      <td className="py-3 text-zinc-700">{i + 1}</td>
-                      <td className="py-3 text-zinc-900 font-medium">{r.nama}</td>
-                      <td className="py-3">
-                        <span
-                          className={[
-                            "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1",
-                            r.status === "tercapai"
-                              ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                              : "bg-amber-50 text-amber-700 ring-amber-200",
-                          ].join(" ")}
-                        >
-                          {r.status}
-                        </span>
+                      <td className="py-3 text-zinc-700 text-center font-medium">
+                        {i + 1}
                       </td>
-                      <td className="py-3 text-zinc-900">{r.nilai ?? "-"}</td>
+
+                      <td className="py-3 text-zinc-900 font-semibold">
+                        {r.nama}
+                      </td>
+
                       <td className="py-3 text-center">
-                        {/* Button shadcn/ui */}
+                        <div className="flex justify-center">
+                          <span
+                            className={[
+                              "inline-flex items-center rounded-full px-3 py-1 text-[14px] font-medium ring-1",
+                              r.status === "Tercapai"
+                                ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                                : "bg-amber-50 text-amber-700 ring-amber-200",
+                            ].join(" ")}
+                          >
+                            {r.status}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="py-3 text-zinc-900 text-center font-medium">
+                        {r.nilai ?? "-"}
+                      </td>
+
+                      <td className="py-3 text-center">
                         <Button
-                          variant="default"
                           size="sm"
-                          className="h-8 rounded-xl px-4 text-xs font-medium"
+                          className="h-9 rounded-lg px-4 text-[14px] font-semibold bg-[#05398f] hover:bg-[#042E71] text-white transition-colors"
                           onClick={() => toggleDetail(r.id)}
                         >
-                          {expandedId === r.id ? "Tutup" : "Detail"}
+                          {expandedIds.includes(r.id) ? "Tutup" : "Detail"}
                         </Button>
                       </td>
                     </tr>
 
-                    {expandedId === r.id && (
+                    {expandedIds.includes(r.id) && (
                       <tr className="bg-zinc-50">
                         <td colSpan={5} className="p-0">
-                          <div className="mx-3 my-2 rounded-lg border border-zinc-200 bg-white shadow-sm">
-                            <div className="px-4 py-3">
-                              <h3 className="text-[15px] font-semibold text-zinc-900 mb-2">
+                          <div className="mx-3 my-3 rounded-xl border border-zinc-200 bg-white shadow-sm">
+                            <div className="px-6 py-4">
+                              <h3 className="text-lg font-semibold text-zinc-900 mb-3">
                                 Detail Kompetensi
                               </h3>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-3 text-[16px]">
                                 <div className="space-y-2">
                                   <div>
-                                    <p className="text-xs text-zinc-500">ID</p>
-                                    <p className="text-zinc-900 font-medium text-[15px]">{r.id}</p>
+                                    <p className="text-sm text-zinc-500 font-medium">
+                                      ID
+                                    </p>
+                                    <p className="text-zinc-900 font-semibold">
+                                      {r.id}
+                                    </p>
                                   </div>
                                   <div>
-                                    <p className="text-xs text-zinc-500">Kode</p>
-                                    <p className="text-zinc-900 font-medium text-[15px]">{r.kode}</p>
+                                    <p className="text-sm text-zinc-500 font-medium">
+                                      Kode
+                                    </p>
+                                    <p className="text-zinc-900 font-semibold">
+                                      {r.kode}
+                                    </p>
                                   </div>
                                 </div>
+
                                 <div className="space-y-2">
                                   <div>
-                                    <p className="text-xs text-zinc-500">Job Family Kompetensi</p>
-                                    <p className="text-zinc-900 font-medium text-[15px]">{r.jobFamily}</p>
+                                    <p className="text-sm text-zinc-500 font-medium">
+                                      Job Family Kompetensi
+                                    </p>
+                                    <p className="text-zinc-900 font-semibold">
+                                      {r.jobFamily}
+                                    </p>
                                   </div>
                                   <div>
-                                    <p className="text-xs text-zinc-500">Sub Job Family Kompetensi</p>
-                                    <p className="text-zinc-900 font-medium text-[15px]">{r.subJob}</p>
+                                    <p className="text-sm text-zinc-500 font-medium">
+                                      Sub Job Family Kompetensi
+                                    </p>
+                                    <p className="text-zinc-900 font-semibold">
+                                      {r.subJob}
+                                    </p>
                                   </div>
                                 </div>
+                              </div>
+
+                              <div className="mt-4 pt-3 border-t border-zinc-200">
+                                <p className="text-sm text-zinc-500 font-medium mb-1">
+                                  Deskripsi Kompetensi
+                                </p>
+                                <p className="text-[16px] text-zinc-900 font-semibold leading-relaxed">
+                                  {r.deskripsi}
+                                </p>
                               </div>
                             </div>
                           </div>
