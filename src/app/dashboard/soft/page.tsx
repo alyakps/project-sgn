@@ -10,17 +10,18 @@ import {
   PolarRadiusAxis,
   ResponsiveContainer,
   Tooltip,
+  Legend,
 } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 type Row = {
   id: string;
-  kode: string;
-  label: string;
-  nama: string;
+  kode: string;   // 3-letter code
+  label: string;  // short label
+  nama: string;   // long name
   status: "Tercapai" | "Tidak Tercapai";
-  nilai: number;
+  nilai: number;  // user's score
   deskripsi: string;
 };
 
@@ -44,8 +45,20 @@ const ALL: Row[] = [
   { id: "963", kode: "DGL", label: "Digital Literate", nama: "Digital Literate (Pemahaman Digital)", status: "Tercapai", nilai: 82, deskripsi: "Praesent commodo cursus magna, vel scelerisque nisl." },
 ];
 
-// 17 titik untuk radar
-const RADAR_DATA = ALL.map((d) => ({ kode: d.kode, label: d.label, value: d.nilai }));
+/** Dummy rata-rata perusahaan per kompetensi (silakan ganti dari API-mu) */
+const AVG_BY_KODE: Record<string, number> = {
+  CIN: 82, TRL: 79, NEP: 81, INF: 75, RSL: 84, ACH: 80,
+  CFO: 76, ORC: 72, ETO: 85, MED: 70, BCR: 88, BSV: 83,
+  CSF: 80, STO: 78, STM: 86, EXF: 82, DGL: 85,
+};
+
+// Data untuk radar: gabungkan nilai user + rata-rata
+const RADAR_DATA = ALL.map((d) => ({
+  kode: d.kode,
+  label: d.label,
+  value: d.nilai,                 // nilai user
+  avg: AVG_BY_KODE[d.kode] ?? 0,  // nilai rata-rata
+}));
 
 function band(v: number) {
   if (v >= 86) return "High";
@@ -55,7 +68,6 @@ function band(v: number) {
 
 export default function SoftCompetencyPage() {
   const [openRows, setOpenRows] = React.useState<Set<string>>(new Set());
-
   const toggleDetail = (id: string) => {
     setOpenRows((prev) => {
       const next = new Set(prev);
@@ -99,25 +111,49 @@ export default function SoftCompetencyPage() {
                   tickFormatter={(v: number) => String(v)}
                   tick={{ fontSize: 10 }}
                 />
+
+                {/* Seri 1: Nilai User */}
                 <Radar
-                  name="Nilai"
+                  name="Your Score"
                   dataKey="value"
-                  stroke="#5B43F9"
-                  fill="#5B43F9"
+                  stroke="#7CE21D"
+                  fill="#ABEC6F"
                   fillOpacity={0.35}
                 />
+                {/* Seri 2: Rata-rata Perusahaan */}
+                <Radar
+                  name="Average Employee Score"
+                  dataKey="avg"
+                  stroke="#E53535"   // sky-400
+                  fill="#EC6F6F"
+                  fillOpacity={0.2}
+                />
+
+                <Legend
+                  verticalAlign="top"
+                  align="center"
+                  wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
+                  iconType="circle"
+                />
+
                 <Tooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.[0]) return null;
-                    const p = payload[0].payload as { kode: string; value: number; label: string };
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload || payload.length === 0) return null;
+                    // Cari nilai per-seri
+                    const pUser = payload.find((p) => p.dataKey === "value");
+                    const pAvg = payload.find((p) => p.dataKey === "avg");
+                    const kode = (pUser?.payload?.kode ?? label) as string;
+                    const lbl = (pUser?.payload?.label ?? "") as string;
+                    const vUser = Number(pUser?.value ?? 0);
+                    const vAvg = Number(pAvg?.value ?? 0);
+                    const diff = vUser - vAvg;
                     return (
                       <div className="rounded-md border bg-white px-3 py-2 text-xs shadow">
-                        <div className="font-semibold">{p.label}</div>
-                        <div className="text-zinc-600">
-                          Kode: <span className="font-medium">{p.kode}</span>
-                        </div>
-                        <div className="text-zinc-600">
-                          Nilai: <span className="font-medium">{p.value}</span> ({band(p.value)})
+                        <div className="font-semibold">{lbl}</div>
+                        <div className="text-zinc-600">Kode: <span className="font-medium">{kode}</span></div>
+                        <div className="mt-1 space-y-0.5">
+                          <div>Your Score: <span className="font-semibold">{vUser}</span> ({band(vUser)})</div>
+                          <div>Average: <span className="font-semibold">{vAvg}</span></div>
                         </div>
                       </div>
                     );
@@ -129,7 +165,7 @@ export default function SoftCompetencyPage() {
         </CardContent>
       </Card>
 
-      {/* TABEL */}
+      {/* TABEL (tetap) */}
       <Card>
         <CardContent className="p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-zinc-900 mb-4">
@@ -146,19 +182,16 @@ export default function SoftCompetencyPage() {
                 <col className="w-24" />
                 <col className="w-32" />
               </colgroup>
-
               <thead>
                 <tr className="text-[15px] font-semibold text-zinc-700 border-b border-zinc-200">
-                  {/* 👇 No sejajar (center) */}
                   <th className="py-3 text-center">No</th>
                   <th className="py-3 text-left">Kode</th>
-                  <th className="py-3 text-left">Nama Kompetensi</th>
+                  <th className="py-3 text-left">Kompetensi</th>
                   <th className="py-3 text-center">Status</th>
                   <th className="py-3 text-center">Nilai</th>
                   <th className="py-3 text-center">Detail</th>
                 </tr>
               </thead>
-
               <tbody>
                 {ALL.map((r, i) => (
                   <React.Fragment key={r.id}>
@@ -167,7 +200,6 @@ export default function SoftCompetencyPage() {
                         openRows.has(r.id) ? "bg-zinc-50" : "hover:bg-zinc-50"
                       }`}
                     >
-                      {/* 👇 isi No juga center */}
                       <td className="py-3 text-center text-zinc-700">{i + 1}</td>
                       <td className="py-3 text-zinc-900 font-semibold">{r.kode}</td>
                       <td className="py-3 text-zinc-900">{r.nama}</td>
@@ -219,7 +251,7 @@ export default function SoftCompetencyPage() {
                                 </div>
                                 <div className="space-y-2">
                                   <div>
-                                    <p className="text-sm text-zinc-500 font-medium">Nama Kompetensi</p>
+                                    <p className="text-sm text-zinc-500 font-medium">Kompetensi</p>
                                     <p className="text-zinc-900 font-semibold text-[16px]">{r.nama}</p>
                                   </div>
                                 </div>

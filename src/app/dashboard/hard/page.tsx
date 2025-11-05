@@ -66,18 +66,23 @@ const DATA: Row[] = [
 export default function HardCompetencyPage() {
   const [expandedIds, setExpandedIds] = React.useState<string[]>([]);
   const toggleDetail = (id: string) =>
-    setExpandedIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+    setExpandedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
 
   return (
-    // ⬇️ Tambah padding kiri khusus mobile agar tidak ketimpa sidebar (w-16 = 64px → pakai ~80px dengan sedikit jarak)
-    <div className="pl-20 md:pl-0 pr-2 md:pr-0 flex flex-col gap-6 min-w-0">
-      <Card className="bg-white border border-zinc-200 shadow-xl rounded-2xl">
+    // ❌ tidak perlu offset kiri/calc width di sini — layout sudah handle sidebar
+    <div className="w-full min-w-0 flex flex-col gap-6 px-2 md:px-0">
+      <Card className="bg-white border border-zinc-200 shadow-xl rounded-2xl w-full">
         <CardContent className="p-6">
-          <h2 className="text-xl font-semibold text-zinc-900 mb-5">Hard Competency</h2>
+          <h2 className="text-xl font-semibold text-zinc-900 mb-5">
+            Hard Competency
+          </h2>
 
-          {/* scroll horizontal hanya di dalam tabel */}
-          <div className="w-full overflow-x-auto">
-            <table className="w-full table-fixed text-[16px]">
+          {/* Scroll horizontal hanya di dalam tabel */}
+          <div className="-mx-2 md:mx-0 px-2 md:px-0 w-auto overflow-x-auto">
+            {/* min-w mencegah kolom mepet; kalau layar < 640px, container ini yang scroll */}
+            <table className="min-w-[640px] w-full table-fixed text-[16px]">
               <colgroup>
                 <col className="w-12" />
                 <col />
@@ -86,10 +91,10 @@ export default function HardCompetencyPage() {
                 <col className="w-32" />
               </colgroup>
 
-              <thead>
+              <thead className="whitespace-nowrap">
                 <tr className="text-[17px] font-semibold text-zinc-700 border-b border-zinc-200">
                   <th className="py-3 text-center">No</th>
-                  <th className="py-3 text-left">Nama Kompetensi</th>
+                  <th className="py-3 text-left">Kompetensi</th>
                   <th className="py-3 text-center">Status</th>
                   <th className="py-3 text-center">Nilai</th>
                   <th className="py-3 text-center">Detail</th>
@@ -101,11 +106,17 @@ export default function HardCompetencyPage() {
                   <React.Fragment key={r.id}>
                     <tr
                       className={`border-b border-zinc-100 transition ${
-                        expandedIds.includes(r.id) ? "bg-zinc-50" : "hover:bg-zinc-50"
+                        expandedIds.includes(r.id)
+                          ? "bg-zinc-50"
+                          : "hover:bg-zinc-50"
                       }`}
                     >
-                      <td className="py-3 text-zinc-700 text-center font-medium">{i + 1}</td>
-                      <td className="py-3 text-zinc-900 font-semibold">{r.nama}</td>
+                      <td className="py-3 text-zinc-700 text-center font-medium">
+                        {i + 1}
+                      </td>
+                      <td className="py-3 text-zinc-900 font-semibold">
+                        {r.nama}
+                      </td>
                       <td className="py-3 text-center">
                         <div className="flex justify-center">
                           <span
@@ -146,12 +157,20 @@ export default function HardCompetencyPage() {
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-3 text-[16px]">
                                 <div className="space-y-2">
                                   <div>
-                                    <p className="text-sm text-zinc-500 font-medium">ID</p>
-                                    <p className="text-zinc-900 font-semibold">{r.id}</p>
+                                    <p className="text-sm text-zinc-500 font-medium">
+                                      ID
+                                    </p>
+                                    <p className="text-zinc-900 font-semibold">
+                                      {r.id}
+                                    </p>
                                   </div>
                                   <div>
-                                    <p className="text-sm text-zinc-500 font-medium">Kode</p>
-                                    <p className="text-zinc-900 font-semibold">{r.kode}</p>
+                                    <p className="text-sm text-zinc-500 font-medium">
+                                      Kode
+                                    </p>
+                                    <p className="text-zinc-900 font-semibold">
+                                      {r.kode}
+                                    </p>
                                   </div>
                                 </div>
 
@@ -160,13 +179,17 @@ export default function HardCompetencyPage() {
                                     <p className="text-sm text-zinc-500 font-medium">
                                       Job Family Kompetensi
                                     </p>
-                                    <p className="text-zinc-900 font-semibold">{r.jobFamily}</p>
+                                    <p className="text-zinc-900 font-semibold">
+                                      {r.jobFamily}
+                                    </p>
                                   </div>
                                   <div>
                                     <p className="text-sm text-zinc-500 font-medium">
                                       Sub Job Family Kompetensi
                                     </p>
-                                    <p className="text-zinc-900 font-semibold">{r.subJob}</p>
+                                    <p className="text-zinc-900 font-semibold">
+                                      {r.subJob}
+                                    </p>
                                   </div>
                                 </div>
                               </div>

@@ -1,8 +1,9 @@
+// src/app/dashboard/layout.tsx
 "use client";
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Tooltip,
   TooltipContent,
@@ -24,7 +25,6 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
 
   const isActive = (base: string) =>
     pathname === base || pathname.startsWith(base + "/");
@@ -93,30 +93,13 @@ export default function DashboardLayout({
               icon={<User className="h-5 w-5" />}
             />
 
-            {/* Logout (ikon saat compact) */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="md:hidden h-10 w-10 text-[#05398f]"
-                  onClick={() => router.push("/")}
-                >
-                  <LogOut className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Logout</TooltipContent>
-            </Tooltip>
-
-            {/* Logout (teks saat lebar) */}
-            <Button
-              onClick={() => router.push("/")}
-              className="hidden md:flex items-center justify-start gap-2 text-[19px] text-[#05398f] hover:bg-[#05398f] hover:text-white"
-              variant="ghost"
-            >
-              <LogOut className="h-5 w-5" />
-              Logout
-            </Button>
+            {/* Logout now reuses SidebarItem so styling matches exactly */}
+            <SidebarItem
+              href="/"
+              label="Logout"
+              active={false}
+              icon={<LogOut className="h-5 w-5" />}
+            />
           </div>
         </aside>
 
