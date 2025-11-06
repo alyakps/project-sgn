@@ -1,4 +1,3 @@
-// src/app/dashboard/soft/page.tsx
 "use client";
 
 import * as React from "react";
@@ -17,11 +16,11 @@ import { Button } from "@/components/ui/button";
 
 type Row = {
   id: string;
-  kode: string;   // 3-letter code
-  label: string;  // short label
-  nama: string;   // long name
+  kode: string;
+  label: string;
+  nama: string;
   status: "Tercapai" | "Tidak Tercapai";
-  nilai: number;  // user's score
+  nilai: number;
   deskripsi: string;
 };
 
@@ -45,111 +44,68 @@ const ALL: Row[] = [
   { id: "963", kode: "DGL", label: "Digital Literate", nama: "Digital Literate (Pemahaman Digital)", status: "Tercapai", nilai: 82, deskripsi: "Praesent commodo cursus magna, vel scelerisque nisl." },
 ];
 
-/** Dummy rata-rata perusahaan per kompetensi (silakan ganti dari API-mu) */
 const AVG_BY_KODE: Record<string, number> = {
-  CIN: 82, TRL: 79, NEP: 81, INF: 75, RSL: 84, ACH: 80,
-  CFO: 76, ORC: 72, ETO: 85, MED: 70, BCR: 88, BSV: 83,
-  CSF: 80, STO: 78, STM: 86, EXF: 82, DGL: 85,
+  CIN: 82, TRL: 79, NEP: 81, INF: 75, RSL: 84, ACH: 80, CFO: 76, ORC: 72, ETO: 85,
+  MED: 70, BCR: 88, BSV: 83, CSF: 80, STO: 78, STM: 86, EXF: 82, DGL: 85,
 };
 
-// Data untuk radar: gabungkan nilai user + rata-rata
-const RADAR_DATA = ALL.map((d) => ({
-  kode: d.kode,
-  label: d.label,
-  value: d.nilai,                 // nilai user
-  avg: AVG_BY_KODE[d.kode] ?? 0,  // nilai rata-rata
-}));
-
-function band(v: number) {
-  if (v >= 86) return "High";
-  if (v >= 70) return "Middle";
-  return "Low";
-}
+const band = (v: number) => (v >= 86 ? "High" : v >= 70 ? "Middle" : "Low");
 
 export default function SoftCompetencyPage() {
-  const [openRows, setOpenRows] = React.useState<Set<string>>(new Set());
-  const toggleDetail = (id: string) => {
-    setOpenRows((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
+  const [openId, setOpenId] = React.useState<string | null>(null);
+
+  const radarData = React.useMemo(
+    () =>
+      ALL.map((d) => ({
+        kode: d.kode,
+        label: d.label,
+        value: d.nilai,
+        avg: AVG_BY_KODE[d.kode] ?? 0,
+      })),
+    []
+  );
 
   return (
     <div className="flex flex-col gap-6">
       {/* RADAR */}
       <Card>
         <CardContent className="p-4 sm:p-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-base sm:text-lg font-semibold">Soft Competency</h2>
             <div className="hidden sm:flex items-center gap-4 text-xs text-zinc-600">
               <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                High (86–100)
+                <span className="h-2 w-2 rounded-full bg-emerald-500" /> High (86–100)
               </span>
               <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-                Middle (70–85)
+                <span className="h-2 w-2 rounded-full bg-amber-500" /> Middle (70–85)
               </span>
               <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-rose-500" />
-                Low (0–69)
+                <span className="h-2 w-2 rounded-full bg-rose-500" /> Low (0–69)
               </span>
             </div>
           </div>
 
-          <div className="mt-4 h-[420px] w-full">
+          <div className="mt-4 h-[380px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={RADAR_DATA} outerRadius="75%">
+              <RadarChart data={radarData} outerRadius="75%">
                 <PolarGrid gridType="polygon" />
                 <PolarAngleAxis dataKey="kode" tick={{ fontSize: 11 }} />
-                <PolarRadiusAxis
-                  angle={30}
-                  domain={[0, 100]}
-                  tickCount={5}
-                  tickFormatter={(v: number) => String(v)}
-                  tick={{ fontSize: 10 }}
-                />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tickCount={5} tick={{ fontSize: 10 }} />
 
-                {/* Seri 1: Nilai User */}
-                <Radar
-                  name="Your Score"
-                  dataKey="value"
-                  stroke="#7CE21D"
-                  fill="#ABEC6F"
-                  fillOpacity={0.35}
-                />
-                {/* Seri 2: Rata-rata Perusahaan */}
-                <Radar
-                  name="Average Employee Score"
-                  dataKey="avg"
-                  stroke="#E53535"   // sky-400
-                  fill="#EC6F6F"
-                  fillOpacity={0.2}
-                />
+                <Radar name="Your Score" dataKey="value" stroke="#16a34a" fill="#16a34a" fillOpacity={0.25} />
+                <Radar name="Average" dataKey="avg" stroke="#2563eb" fill="#2563eb" fillOpacity={0.15} />
 
-                <Legend
-                  verticalAlign="top"
-                  align="center"
-                  wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
-                  iconType="circle"
-                />
-
+                <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} />
                 <Tooltip
-                  content={({ active, payload, label }) => {
-                    if (!active || !payload || payload.length === 0) return null;
-                    // Cari nilai per-seri
-                    const pUser = payload.find((p) => p.dataKey === "value");
-                    const pAvg = payload.find((p) => p.dataKey === "avg");
-                    const kode = (pUser?.payload?.kode ?? label) as string;
-                    const lbl = (pUser?.payload?.label ?? "") as string;
-                    const vUser = Number(pUser?.value ?? 0);
-                    const vAvg = Number(pAvg?.value ?? 0);
-                    const diff = vUser - vAvg;
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null;
+                    const kode = String(payload[0].payload.kode);
+                    const label = String(payload[0].payload.label);
+                    const vUser = Number(payload.find((p) => p.dataKey === "value")?.value ?? 0);
+                    const vAvg = Number(payload.find((p) => p.dataKey === "avg")?.value ?? 0);
                     return (
-                      <div className="rounded-md border bg-white px-3 py-2 text-xs shadow">
-                        <div className="font-semibold">{lbl}</div>
+                      <div className="rounded border bg-white px-3 py-2 text-xs shadow">
+                        <div className="font-semibold">{label}</div>
                         <div className="text-zinc-600">Kode: <span className="font-medium">{kode}</span></div>
                         <div className="mt-1 space-y-0.5">
                           <div>Your Score: <span className="font-semibold">{vUser}</span> ({band(vUser)})</div>
@@ -165,46 +121,33 @@ export default function SoftCompetencyPage() {
         </CardContent>
       </Card>
 
-      {/* TABEL (tetap) */}
+      {/* TABEL */}
       <Card>
         <CardContent className="p-4 sm:p-6">
-          <h3 className="text-lg font-semibold text-zinc-900 mb-4">
-            Daftar Kompetensi
-          </h3>
+          <h3 className="text-lg font-semibold mb-4">Daftar Kompetensi</h3>
 
           <div className="w-full overflow-x-auto">
-            <table className="w-full table-fixed text-[15px]">
-              <colgroup>
-                <col className="w-12" />
-                <col className="w-20" />
-                <col />
-                <col className="w-40" />
-                <col className="w-24" />
-                <col className="w-32" />
-              </colgroup>
+            <table className="w-full text-sm sm:text-[15px]">
               <thead>
-                <tr className="text-[15px] font-semibold text-zinc-700 border-b border-zinc-200">
-                  <th className="py-3 text-center">No</th>
-                  <th className="py-3 text-left">Kode</th>
-                  <th className="py-3 text-left">Kompetensi</th>
-                  <th className="py-3 text-center">Status</th>
-                  <th className="py-3 text-center">Nilai</th>
-                  <th className="py-3 text-center">Detail</th>
+                <tr className="text-zinc-700 border-b">
+                  <th className="py-3 px-2 text-center">No</th>
+                  <th className="py-3 px-2 text-left">Kode</th>
+                  <th className="py-3 px-2 text-left">Kompetensi</th>
+                  <th className="py-3 px-2 text-center">Status</th>
+                  <th className="py-3 px-2 text-center">Nilai</th>
+                  <th className="py-3 px-2 text-center">Detail</th>
                 </tr>
               </thead>
               <tbody>
-                {ALL.map((r, i) => (
-                  <React.Fragment key={r.id}>
-                    <tr
-                      className={`border-b border-zinc-100 transition ${
-                        openRows.has(r.id) ? "bg-zinc-50" : "hover:bg-zinc-50"
-                      }`}
-                    >
-                      <td className="py-3 text-center text-zinc-700">{i + 1}</td>
-                      <td className="py-3 text-zinc-900 font-semibold">{r.kode}</td>
-                      <td className="py-3 text-zinc-900">{r.nama}</td>
-                      <td className="py-3 text-center">
-                        <div className="flex justify-center">
+                {ALL.map((r, i) => {
+                  const open = openId === r.id;
+                  return (
+                    <React.Fragment key={r.id}>
+                      <tr className={`border-b transition ${open ? "bg-zinc-50" : "hover:bg-zinc-50"}`}>
+                        <td className="py-3 px-2 text-center">{i + 1}</td>
+                        <td className="py-3 px-2 font-semibold">{r.kode}</td>
+                        <td className="py-3 px-2">{r.nama}</td>
+                        <td className="py-3 px-2 text-center">
                           <span
                             className={[
                               "inline-flex items-center rounded-full px-3 py-1 text-[13px] font-medium ring-1",
@@ -215,61 +158,51 @@ export default function SoftCompetencyPage() {
                           >
                             {r.status}
                           </span>
-                        </div>
-                      </td>
-                      <td className="py-3 text-center text-zinc-900">{r.nilai}</td>
-                      <td className="py-3 text-center">
-                        <Button
-                          size="sm"
-                          className="h-9 rounded-lg px-4 text-[13px] font-semibold bg-[#05398f] hover:bg-[#042E71] text-white transition-colors"
-                          onClick={() => toggleDetail(r.id)}
-                        >
-                          {openRows.has(r.id) ? "Tutup" : "Detail"}
-                        </Button>
-                      </td>
-                    </tr>
-
-                    {openRows.has(r.id) && (
-                      <tr className="bg-zinc-50">
-                        <td colSpan={6} className="p-0">
-                          <div className="mx-3 my-3 rounded-xl border border-zinc-200 bg-white shadow-sm">
-                            <div className="px-6 py-4">
-                              <h4 className="text-lg font-semibold text-zinc-900 mb-3">
-                                Detail Kompetensi
-                              </h4>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-3 text-[15px]">
-                                <div className="space-y-2">
-                                  <div>
-                                    <p className="text-sm text-zinc-500 font-medium">ID</p>
-                                    <p className="text-zinc-900 font-semibold text-[16px]">{r.id}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-zinc-500 font-medium">Kode</p>
-                                    <p className="text-zinc-900 font-semibold text-[16px]">{r.kode}</p>
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <div>
-                                    <p className="text-sm text-zinc-500 font-medium">Kompetensi</p>
-                                    <p className="text-zinc-900 font-semibold text-[16px]">{r.nama}</p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="mt-4 pt-3 border-t border-zinc-200">
-                                <p className="text-sm text-zinc-500 font-medium mb-1">Deskripsi</p>
-                                <p className="text-[16px] text-zinc-900 font-semibold leading-relaxed">
-                                  {r.deskripsi}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
+                        </td>
+                        <td className="py-3 px-2 text-center">{r.nilai}</td>
+                        <td className="py-3 px-2 text-center">
+                          <Button
+                            size="sm"
+                            className="h-9 rounded-lg px-4 text-[13px] font-semibold"
+                            onClick={() => setOpenId(open ? null : r.id)}
+                          >
+                            {open ? "Tutup" : "Detail"}
+                          </Button>
                         </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                ))}
+
+                      {open && (
+                        <tr className="bg-zinc-50">
+                          <td colSpan={6} className="p-0">
+                            <div className="m-3 rounded-xl border bg-white shadow-sm">
+                              <div className="px-6 py-4 space-y-3">
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <div>
+                                    <p className="text-xs text-zinc-500">ID</p>
+                                    <p className="text-[15px] font-semibold">{r.id}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-zinc-500">Kode</p>
+                                    <p className="text-[15px] font-semibold">{r.kode}</p>
+                                  </div>
+                                  <div className="sm:col-span-2">
+                                    <p className="text-xs text-zinc-500">Kompetensi</p>
+                                    <p className="text-[15px] font-semibold">{r.nama}</p>
+                                  </div>
+                                </div>
+
+                                <div className="pt-3 border-t">
+                                  <p className="text-xs text-zinc-500 mb-1">Deskripsi</p>
+                                  <p className="text-[15px] leading-relaxed">{r.deskripsi}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
