@@ -14,6 +14,7 @@ type Props = {
   notAchieved: number;
   average: number;
   onClick?: () => void;
+  filterSlot?: React.ReactNode;
 };
 
 export default function ProgressSummaryCard({
@@ -25,25 +26,54 @@ export default function ProgressSummaryCard({
   notAchieved,
   average,
   onClick,
+  filterSlot,
 }: Props) {
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
+  const handleKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!onClick) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick();
+    }
+  };
+
   return (
-    <button
-      type="button"
+    <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : -1}
       onClick={onClick}
+      onKeyDown={handleKey}
       className="group block w-full text-left focus:outline-none"
     >
-      <Card className="rounded-xl border border-zinc-200 transition ring-0 group-hover:ring-2 group-hover:ring-violet-300">
-        <CardContent className="pt-2 pb-2 px-4 sm:pt-3 sm:pb-3">
-          <div className="mb-2 flex items-center justify-between">
+      <Card className="rounded-xl border border-zinc-200 transition ring-0 group-hover:ring-2 group-hover:ring-violet-300 focus-within:ring-2 focus-within:ring-violet-300">
+        {/*super compact padding */}
+        <CardContent className="pt-0.5 pb-0.5 px-3 sm:px-4">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-0.5">
             <h2 className="text-[15px] sm:text-base font-semibold text-zinc-900">
               {title}
             </h2>
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700">
-              {totalItems} item
-            </span>
+
+            {filterSlot ? (
+              <div
+                className="flex items-center gap-2"
+                onClick={stop}
+                onMouseDown={stop}
+                onPointerDown={stop}
+                onKeyDown={stop}
+              >
+                {filterSlot}
+              </div>
+            ) : (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700">
+                {totalItems} item
+              </span>
+            )}
           </div>
 
-          <div className="mb-2 flex items-center gap-4 text-[11px] text-zinc-600">
+          {/* Legend */}
+          <div className="mb-1 flex items-center gap-3 text-[11px] text-zinc-600">
             <span className="inline-flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-emerald-500" /> High (86–100)
             </span>
@@ -55,6 +85,7 @@ export default function ProgressSummaryCard({
             </span>
           </div>
 
+          {/* Stats */}
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-lg border p-3">
               <div className="text-[11px] text-zinc-500">{achievedLabel}</div>
@@ -73,6 +104,6 @@ export default function ProgressSummaryCard({
           </div>
         </CardContent>
       </Card>
-    </button>
+    </div>
   );
 }

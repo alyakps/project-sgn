@@ -12,7 +12,7 @@ export default function ProfilePage() {
     namaLengkap: "Muchammad Hardhiaz Maulana Putra",
     jabatanTerakhir: "Backend Developer Intern",
     nikPn: "5025211018",
-    handphone: "0812-3456-7890",
+    handphone: "081234567890",
     email: "andrian.tambunan@example.com",
     avatarUrl: "/avatar.png",
     avatarAlt: "Andrian Tambunan",
@@ -78,8 +78,8 @@ export default function ProfilePage() {
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-y-2 lg:gap-x-8 relative">
               {/* Kolom kiri */}
               <div className="space-y-2">
-                <KVStack label="PN / NIK" value={main.nikPn} nowrap />
-                <KVStack label="Phone number" value={main.handphone} nowrap />
+                <KVStack label="NIK" value={main.nikPn} nowrap />
+                <KVStack label="Handphone" value={main.handphone} nowrap />
               </div>
 
               {/* Garis vertikal pemisah (desktop only) */}
@@ -104,7 +104,7 @@ export default function ProfilePage() {
           <TwoColList items={personal} />
         </SectionCard>
 
-        <SectionCard title="Performance">
+        <SectionCard title="Work Performance">
           <div className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground mb-1">
