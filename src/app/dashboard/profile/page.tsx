@@ -46,12 +46,15 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 md:px-6">
+    <div className="flex flex-col gap-3">
+      {/* ===== PAGE TITLE ===== */}
+      <h2 className="text-lg sm:text-xl font-semibold">Profile</h2>
+
       {/* ===== MAIN CARD ===== */}
       <Card className="p-6">
         <div className="flex flex-col md:flex-row md:items-start gap-6">
           {/* Avatar */}
-          <Avatar className="h-20 w-20 shrink-0">
+          <Avatar className="h-17.5 w-17.5 shrink-0">
             <AvatarImage src={main.avatarUrl} alt={main.avatarAlt} />
             <AvatarFallback>{initials(main.namaLengkap)}</AvatarFallback>
           </Avatar>
@@ -82,8 +85,7 @@ export default function ProfilePage() {
                 <KVStack label="Handphone" value={main.handphone} nowrap />
               </div>
 
-              {/* Garis vertikal pemisah (desktop only) */}
-              <div className="hidden lg:block absolute left-1/2 top-0 bottom-0 border-l border-gray-200" />
+              {/* Garis vertikal dihapus di sini */}
 
               {/* Kolom kanan */}
               <div className="pt-2 lg:pt-0 lg:pl-10">

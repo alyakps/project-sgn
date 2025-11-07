@@ -71,81 +71,84 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Heading */}
-      <header className="px-6 sm:px-8 mt-2">
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight text-zinc-900">
-          Welcome, {firstName}
-        </h1>
-      </header>
+      {/* ===== WRAPPER KONTEN ===== */}
+      <div className="px-6 sm:px-8 mt-2 space-y-4">
+        {/* Heading */}
+        <header>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight text-zinc-900">
+            Welcome, {firstName}
+          </h1>
+        </header>
 
-      {/* Profile */}
-      <ProfileCard
-        name={EMP_NAME}
-        avatarUrl={EMP_AVATAR}
-        empNo={EMP_NO}
-        title={EMP_TITLE}
-        unit={EMP_UNIT}
-      />
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* HARD */}
-        <ProgressSummaryCard
-          title="Progress – Hard Competency"
-          totalItems={filteredHard.length}
-          achieved={hard.achieved}
-          notAchieved={hard.notAchieved}
-          average={hard.average}
-          onClick={() => router.push("/dashboard/hard")}
-          filterSlot={
-            <div className="flex items-center gap-2">
-              <Label htmlFor="year-hard" className="text-xs text-muted-foreground">
-                Year
-              </Label>
-              <Select value={yearHard} onValueChange={(v) => setYearHard(v as any)}>
-                <SelectTrigger id="year-hard" className="h-8 w-28">
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  {YEAR_OPTIONS.map((y) => (
-                    <SelectItem key={y} value={y}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          }
+        {/* Profile */}
+        <ProfileCard
+          name={EMP_NAME}
+          avatarUrl={EMP_AVATAR}
+          empNo={EMP_NO}
+          title={EMP_TITLE}
+          unit={EMP_UNIT}
         />
 
-        {/* SOFT */}
-        <ProgressSummaryCard
-          title="Progress – Soft Competency"
-          totalItems={filteredSoft.length}
-          achieved={soft.achieved}
-          notAchieved={soft.notAchieved}
-          average={soft.average}
-          onClick={() => router.push("/dashboard/soft")}
-          filterSlot={
-            <div className="flex items-center gap-2">
-              <Label htmlFor="year-soft" className="text-xs text-muted-foreground">
-                Year
-              </Label>
-              <Select value={yearSoft} onValueChange={(v) => setYearSoft(v as any)}>
-                <SelectTrigger id="year-soft" className="h-8 w-28">
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  {YEAR_OPTIONS.map((y) => (
-                    <SelectItem key={y} value={y}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          }
-        />
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* HARD */}
+          <ProgressSummaryCard
+            title="Progress – Hard Competency"
+            totalItems={filteredHard.length}
+            achieved={hard.achieved}
+            notAchieved={hard.notAchieved}
+            average={hard.average}
+            onClick={() => router.push("/dashboard/hard")}
+            filterSlot={
+              <div className="flex items-center gap-2">
+                <Label htmlFor="year-hard" className="text-xs text-muted-foreground">
+                  Year
+                </Label>
+                <Select value={yearHard} onValueChange={(v) => setYearHard(v as any)}>
+                  <SelectTrigger id="year-hard" className="h-8 w-28">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent align="end">
+                    {YEAR_OPTIONS.map((y) => (
+                      <SelectItem key={y} value={y}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            }
+          />
+
+          {/* SOFT */}
+          <ProgressSummaryCard
+            title="Progress – Soft Competency"
+            totalItems={filteredSoft.length}
+            achieved={soft.achieved}
+            notAchieved={soft.notAchieved}
+            average={soft.average}
+            onClick={() => router.push("/dashboard/soft")}
+            filterSlot={
+              <div className="flex items-center gap-2">
+                <Label htmlFor="year-soft" className="text-xs text-muted-foreground">
+                  Year
+                </Label>
+                <Select value={yearSoft} onValueChange={(v) => setYearSoft(v as any)}>
+                  <SelectTrigger id="year-soft" className="h-8 w-28">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent align="end">
+                    {YEAR_OPTIONS.map((y) => (
+                      <SelectItem key={y} value={y}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            }
+          />
+        </div>
       </div>
     </div>
   );

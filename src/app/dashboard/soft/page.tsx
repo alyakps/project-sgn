@@ -11,8 +11,15 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectValue,
+  SelectItem,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 
 type Row = {
   id: string;
@@ -53,6 +60,8 @@ const band = (v: number) => (v >= 86 ? "High" : v >= 70 ? "Middle" : "Low");
 
 export default function SoftCompetencyPage() {
   const [openId, setOpenId] = React.useState<string | null>(null);
+  const [year, setYear] = React.useState("2025");
+  const years = ["2025", "2024", "2023", "2022"];
 
   const radarData = React.useMemo(
     () =>
@@ -66,148 +75,155 @@ export default function SoftCompetencyPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* RADAR */}
-      <Card>
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-base sm:text-lg font-semibold">Soft Competency</h2>
-            <div className="hidden sm:flex items-center gap-4 text-xs text-zinc-600">
-              <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" /> High (86–100)
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-amber-500" /> Middle (70–85)
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-rose-500" /> Low (0–69)
-              </span>
-            </div>
-          </div>
+    <section className="flex flex-col gap-3">
+      {/* ===== HEADER + FILTER ===== */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-5 pb-0">
+        <h2 className="text-lg sm:text-xl font-semibold">Soft Competency</h2>
 
-          <div className="mt-4 h-[380px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={radarData} outerRadius="75%">
-                <PolarGrid gridType="polygon" />
-                <PolarAngleAxis dataKey="kode" tick={{ fontSize: 11 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} tickCount={5} tick={{ fontSize: 10 }} />
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-zinc-700">Tahun:</span>
+          <Select value={year} onValueChange={setYear}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Pilih tahun" />
+            </SelectTrigger>
+            <SelectContent position="popper" className="z-50">
+              {years.map((y) => (
+                <SelectItem key={y} value={y}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-                <Radar name="Your Score" dataKey="value" stroke="#16a34a" fill="#16a34a" fillOpacity={0.25} />
-                <Radar name="Average" dataKey="avg" stroke="#2563eb" fill="#2563eb" fillOpacity={0.15} />
-
-                <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} />
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null;
-                    const kode = String(payload[0].payload.kode);
-                    const label = String(payload[0].payload.label);
-                    const vUser = Number(payload.find((p) => p.dataKey === "value")?.value ?? 0);
-                    const vAvg = Number(payload.find((p) => p.dataKey === "avg")?.value ?? 0);
-                    return (
-                      <div className="rounded border bg-white px-3 py-2 text-xs shadow">
-                        <div className="font-semibold">{label}</div>
-                        <div className="text-zinc-600">Kode: <span className="font-medium">{kode}</span></div>
-                        <div className="mt-1 space-y-0.5">
-                          <div>Your Score: <span className="font-semibold">{vUser}</span> ({band(vUser)})</div>
-                          <div>Average: <span className="font-semibold">{vAvg}</span></div>
+      {/* ===== RADAR CHART ===== */}
+      <div className="px-3 sm:px-5">
+        <div className="h-[380px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart data={radarData} outerRadius="75%">
+              <PolarGrid gridType="polygon" />
+              <PolarAngleAxis dataKey="kode" tick={{ fontSize: 11 }} />
+              <PolarRadiusAxis angle={30} domain={[0, 100]} tickCount={5} tick={{ fontSize: 10 }} />
+              <Radar name="Your Score" dataKey="value" stroke="#16a34a" fill="#16a34a" fillOpacity={0.25} />
+              <Radar name="Average Employee Score" dataKey="avg" stroke="#2563eb" fill="#2563eb" fillOpacity={0.15} />
+              <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const kode = String(payload[0].payload.kode);
+                  const label = String(payload[0].payload.label);
+                  const vUser = Number(payload.find((p) => p.dataKey === "value")?.value ?? 0);
+                  const vAvg = Number(payload.find((p) => p.dataKey === "avg")?.value ?? 0);
+                  return (
+                    <div className="rounded bg-white px-3 py-2 text-xs shadow">
+                      <div className="font-semibold">{label}</div>
+                      <div className="text-zinc-600">
+                        Kode: <span className="font-medium">{kode}</span>
+                      </div>
+                      <div className="mt-1 space-y-0.5">
+                        <div>
+                          Your Score: <span className="font-semibold">{vUser}</span> ({band(vUser)})
+                        </div>
+                        <div>
+                          Average Score: <span className="font-semibold">{vAvg}</span>
                         </div>
                       </div>
-                    );
-                  }}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+                    </div>
+                  );
+                }}
+              />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
 
-      {/* TABEL */}
-      <Card>
-        <CardContent className="p-4 sm:p-6">
-          <h3 className="text-lg font-semibold mb-4">Daftar Kompetensi</h3>
+      {/* ===== SEPARATOR ===== */}
+      <Separator className="my-2 bg-zinc-200" />
 
-          <div className="w-full overflow-x-auto">
-            <table className="w-full text-sm sm:text-[15px]">
-              <thead>
-                <tr className="text-zinc-700 border-b">
-                  <th className="py-3 px-2 text-center">No</th>
-                  <th className="py-3 px-2 text-left">Kode</th>
-                  <th className="py-3 px-2 text-left">Kompetensi</th>
-                  <th className="py-3 px-2 text-center">Status</th>
-                  <th className="py-3 px-2 text-center">Nilai</th>
-                  <th className="py-3 px-2 text-center">Detail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ALL.map((r, i) => {
-                  const open = openId === r.id;
-                  return (
-                    <React.Fragment key={r.id}>
-                      <tr className={`border-b transition ${open ? "bg-zinc-50" : "hover:bg-zinc-50"}`}>
-                        <td className="py-3 px-2 text-center">{i + 1}</td>
-                        <td className="py-3 px-2 font-semibold">{r.kode}</td>
-                        <td className="py-3 px-2">{r.nama}</td>
-                        <td className="py-3 px-2 text-center">
-                          <span
-                            className={[
-                              "inline-flex items-center rounded-full px-3 py-1 text-[13px] font-medium ring-1",
-                              r.status === "Tercapai"
-                                ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                                : "bg-amber-50 text-amber-700 ring-amber-200",
-                            ].join(" ")}
-                          >
-                            {r.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-2 text-center">{r.nilai}</td>
-                        <td className="py-3 px-2 text-center">
-                          <Button
-                            size="sm"
-                            className="h-9 rounded-lg px-4 text-[13px] font-semibold"
-                            onClick={() => setOpenId(open ? null : r.id)}
-                          >
-                            {open ? "Tutup" : "Detail"}
-                          </Button>
-                        </td>
-                      </tr>
+      {/* ===== TABLE ===== */}
+      <div className="p-4 sm:p-6">
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-sm sm:text-[15px]">
+            <thead>
+              <tr className="text-zinc-700 border-b">
+                <th className="py-3 px-2 text-center">No</th>
+                <th className="py-3 px-2 text-left">Kode</th>
+                <th className="py-3 px-2 text-left">Kompetensi</th>
+                <th className="py-3 px-2 text-center">Status</th>
+                <th className="py-3 px-2 text-center">Nilai</th>
+                <th className="py-3 px-2 text-center">Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ALL.map((r, i) => {
+                const open = openId === r.id;
+                return (
+                  <React.Fragment key={r.id}>
+                    <tr className={`border-b transition ${open ? "bg-zinc-50" : "hover:bg-zinc-50"}`}>
+                      <td className="py-3 px-2 text-center">{i + 1}</td>
+                      <td className="py-3 px-2 font-semibold">{r.kode}</td>
+                      <td className="py-3 px-2">{r.nama}</td>
+                      <td className="py-3 px-2 text-center">
+                        <span
+                          className={[
+                            "inline-flex items-center rounded-full px-3 py-1 text-[13px] font-medium ring-1",
+                            r.status === "Tercapai"
+                              ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                              : "bg-amber-50 text-amber-700 ring-amber-200",
+                          ].join(" ")}
+                        >
+                          {r.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center">{r.nilai}</td>
+                      <td className="py-3 px-2 text-center">
+                        <Button
+                          size="sm"
+                          className="h-9 rounded-lg px-4 text-[13px] font-semibold"
+                          onClick={() => setOpenId(open ? null : r.id)}
+                        >
+                          {open ? "Tutup" : "Detail"}
+                        </Button>
+                      </td>
+                    </tr>
 
-                      {open && (
-                        <tr className="bg-zinc-50">
-                          <td colSpan={6} className="p-0">
-                            <div className="m-3 rounded-xl border bg-white shadow-sm">
-                              <div className="px-6 py-4 space-y-3">
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                  <div>
-                                    <p className="text-xs text-zinc-500">ID</p>
-                                    <p className="text-[15px] font-semibold">{r.id}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs text-zinc-500">Kode</p>
-                                    <p className="text-[15px] font-semibold">{r.kode}</p>
-                                  </div>
-                                  <div className="sm:col-span-2">
-                                    <p className="text-xs text-zinc-500">Kompetensi</p>
-                                    <p className="text-[15px] font-semibold">{r.nama}</p>
-                                  </div>
+                    {open && (
+                      <tr className="bg-zinc-50">
+                        <td colSpan={6} className="p-0">
+                          <div className="m-3 rounded-xl bg-white">
+                            <div className="px-6 py-4 space-y-3">
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                  <p className="text-xs text-zinc-500">ID</p>
+                                  <p className="text-[15px] font-semibold">{r.id}</p>
                                 </div>
-
-                                <div className="pt-3 border-t">
-                                  <p className="text-xs text-zinc-500 mb-1">Deskripsi</p>
-                                  <p className="text-[15px] leading-relaxed">{r.deskripsi}</p>
+                                <div>
+                                  <p className="text-xs text-zinc-500">Kode</p>
+                                  <p className="text-[15px] font-semibold">{r.kode}</p>
+                                </div>
+                                <div className="sm:col-span-2">
+                                  <p className="text-xs text-zinc-500">Kompetensi</p>
+                                  <p className="text-[15px] font-semibold">{r.nama}</p>
                                 </div>
                               </div>
+
+                              <div className="pt-3 border-t">
+                                <p className="text-xs text-zinc-500 mb-1">Deskripsi</p>
+                                <p className="text-[15px] leading-relaxed">{r.deskripsi}</p>
+                              </div>
                             </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   );
 }

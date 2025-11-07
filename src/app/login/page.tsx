@@ -1,7 +1,18 @@
+// src/app/login/page.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -11,16 +22,9 @@ export default function SignInPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
-    // TODO: nanti ganti ini jadi real auth call ke backend kamu
-    // contoh pseudo:
-    // const res = await fetch("/api/login", { method: "POST", body: ... })
-    // if (res.ok) { router.push("/dashboard") } else { error message ... }
-
-    // sementara: pura-pura login sukses
     setTimeout(() => {
       setLoading(false);
-      router.push("/dashboard"); // <-- redirect ke dashboard
+      router.push("/dashboard");
     }, 800);
   };
 
@@ -29,105 +33,97 @@ export default function SignInPage() {
       className="relative min-h-screen w-full flex items-center justify-center p-4 sm:p-6 md:p-8 bg-cover bg-center"
       style={{ backgroundImage: "url('/sugarcane.png')" }}
     >
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px]" />
+      {/* === Glass Card === */}
+      <Card className="relative z-10 w-full max-w-sm rounded-2xl border border-white/40 bg-white/30 backdrop-blur-md shadow-xl">
+        <CardHeader className="px-5 pt-6 pb-4 text-center">
+          {/* Title tengah, super bold dan hitam */}
+          <CardTitle className="text-4xl font-black text-zinc-900 leading-[1.1]">
+            Sign In
+          </CardTitle>
+          <CardDescription className="text-[15px] text-zinc-700 mt-0.5 font-medium">
+            Access your dashboard
+          </CardDescription>
+        </CardHeader>
 
-      {/* Card login */}
-      <div className="relative z-10 w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl rounded-2xl md:rounded-3xl bg-white/95 shadow-2xl ring-1 ring-black/10 p-6 sm:p-8 md:p-10 flex flex-col gap-8 md:gap-10">
-        {/* Header */}
-        <div className="flex items-center gap-4 sm:gap-6">
-          <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-xl sm:rounded-2xl bg-zinc-900 text-white">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-              <polyline points="10 17 15 12 10 7" />
-              <line x1="15" x2="3" y1="12" y2="12" />
-            </svg>
-          </div>
+        <CardContent className="px-5 pb-5">
+          <form onSubmit={onSubmit} className="space-y-4">
+            {/* Email */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="email"
+                className="text-sm font-semibold text-zinc-800"
+              >
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                required
+                autoComplete="username"
+                placeholder="you@example.com"
+                className="h-10 rounded-md bg-white/60 backdrop-blur-sm border-white/40 placeholder:text-zinc-500"
+              />
+            </div>
 
-          <div>
-            <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-zinc-900">
-              Sign in with Email
-            </h1>
-            <p className="text-sm sm:text-base text-zinc-500">
-              Access your dashboard securely
-            </p>
-          </div>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={onSubmit} className="flex flex-col gap-6 sm:gap-8">
-          {/* Email */}
-          <div className="flex flex-col gap-2 sm:gap-3">
-            <label
-              htmlFor="email"
-              className="text-base sm:text-lg font-medium text-zinc-800"
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              className="block w-full rounded-lg sm:rounded-xl border border-zinc-300 bg-white px-4 sm:px-5 py-2.5 sm:py-3 text-base sm:text-lg text-zinc-900 shadow-sm outline-none placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10"
-              placeholder="you@example.com"
-            />
-          </div>
-
-          {/* Password */}
-          <div className="flex flex-col gap-2 sm:gap-3">
-            <div className="flex items-center justify-between">
-              <label
+            {/* Password */}
+            <div className="space-y-2">
+              <Label
                 htmlFor="password"
-                className="text-base sm:text-lg font-medium text-zinc-800"
+                className="text-sm font-semibold text-zinc-800"
               >
                 Password
-              </label>
-              <button
-                type="button"
-                className="text-xs sm:text-sm font-medium text-zinc-500 hover:text-zinc-700"
-              >
-                Forgot password?
-              </button>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  className="h-10 pr-16 rounded-md bg-white/60 backdrop-blur-sm border-white/40 placeholder:text-zinc-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-700 hover:text-zinc-900"
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
             </div>
 
-            <div className="relative">
-              <input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                required
-                className="block w-full rounded-lg sm:rounded-xl border border-zinc-300 bg-white px-4 sm:px-5 py-2.5 sm:py-3 pr-16 text-base sm:text-lg text-zinc-900 shadow-sm outline-none placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10"
-                placeholder="••••••••"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs sm:text-sm font-semibold text-zinc-700 hover:text-zinc-900"
-              >
-                {showPassword ? "Hide" : "Show"}
-              </button>
-            </div>
-          </div>
+            {/* Submit */}
+            <Button
+              type="submit"
+              disabled={loading}
+              className={[
+                "w-full h-10 rounded-md font-semibold text-white",
+                "bg-[#05398f] hover:bg-[#042E71]",
+                "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#05398f]",
+                "disabled:opacity-70 disabled:cursor-not-allowed",
+                "transition-all duration-200",
+                "shadow-lg",
+              ].join(" ")}
+            >
+              {loading ? "Signing in..." : "Sign In"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 inline-flex h-11 sm:h-12 md:h-13 w-full items-center justify-center rounded-lg sm:rounded-xl bg-zinc-900 px-4 sm:px-6 text-base sm:text-lg font-semibold text-white shadow hover:bg-zinc-800 active:bg-zinc-950 disabled:opacity-60 transition-all"
-          >
-            {loading ? "Signing in..." : "Sign In"}
-          </button>
-        </form>
-      </div>
+      {/* Hilangkan ikon mata bawaan browser */}
+      <style jsx global>{`
+        input[type="password"]::-ms-reveal,
+        input[type="password"]::-ms-clear {
+          display: none !important;
+        }
+        input[type="password"]::-webkit-password-toggle-button,
+        input[type="password"]::-webkit-credentials-auto-fill-button,
+        input[type="password"]::-webkit-textfield-decoration-container {
+          display: none !important;
+          appearance: none !important;
+        }
+      `}</style>
     </div>
   );
 }
