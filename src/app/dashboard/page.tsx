@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import ProfileCard from "@/components/dashboard/ProfileCard";
 import ProgressSummaryCard from "@/components/dashboard/ProgressSummaryCard";
@@ -43,20 +44,42 @@ const SOFT: SoftRow[] = [
 
 /* ======= YEAR FILTER ======= */
 const YEAR_OPTIONS = ["All", "2022", "2023", "2024"] as const;
-const HARD_YEAR: (typeof YEAR_OPTIONS)[number][] = ["2022", "2023", "2023", "2024"];
+const HARD_YEAR: (typeof YEAR_OPTIONS)[number][] = [
+  "2022",
+  "2023",
+  "2023",
+  "2024",
+];
 const SOFT_YEAR: (typeof YEAR_OPTIONS)[number][] = [
-  "2022","2022","2022","2023","2023","2023",
-  "2023","2023","2024","2024","2024","2024",
-  "2024","2024","2024","2024","2024",
+  "2022",
+  "2022",
+  "2022",
+  "2023",
+  "2023",
+  "2023",
+  "2023",
+  "2023",
+  "2024",
+  "2024",
+  "2024",
+  "2024",
+  "2024",
+  "2024",
+  "2024",
+  "2024",
+  "2024",
 ];
 
-export default function DashboardPage() {
+function DashboardPage() {
   const router = useRouter();
   const firstName = getFirstName(EMP_NAME);
 
-  // filter per card
-  const [yearHard, setYearHard] = React.useState<(typeof YEAR_OPTIONS)[number]>("All");
-  const [yearSoft, setYearSoft] = React.useState<(typeof YEAR_OPTIONS)[number]>("All");
+  const [yearHard, setYearHard] = React.useState<
+    (typeof YEAR_OPTIONS)[number]
+  >("All");
+  const [yearSoft, setYearSoft] = React.useState<
+    (typeof YEAR_OPTIONS)[number]
+  >("All");
 
   const filteredHard = React.useMemo(
     () => DATA.filter((_, i) => yearHard === "All" || HARD_YEAR[i] === yearHard),
@@ -72,8 +95,8 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-4">
       {/* ===== WRAPPER KONTEN ===== */}
-      <div className="px-6 sm:px-8 mt-2 space-y-4">
-        {/* Heading */}
+      <div className="space-y-4">
+        {/* Heading saja */}
         <header>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight text-zinc-900">
             Welcome, {firstName}
@@ -101,10 +124,16 @@ export default function DashboardPage() {
             onClick={() => router.push("/dashboard/hard")}
             filterSlot={
               <div className="flex items-center gap-2">
-                <Label htmlFor="year-hard" className="text-xs text-muted-foreground">
+                <Label
+                  htmlFor="year-hard"
+                  className="text-xs text-muted-foreground"
+                >
                   Year
                 </Label>
-                <Select value={yearHard} onValueChange={(v) => setYearHard(v as any)}>
+                <Select
+                  value={yearHard}
+                  onValueChange={(v) => setYearHard(v as any)}
+                >
                   <SelectTrigger id="year-hard" className="h-8 w-28">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
@@ -130,10 +159,16 @@ export default function DashboardPage() {
             onClick={() => router.push("/dashboard/soft")}
             filterSlot={
               <div className="flex items-center gap-2">
-                <Label htmlFor="year-soft" className="text-xs text-muted-foreground">
+                <Label
+                  htmlFor="year-soft"
+                  className="text-xs text-muted-foreground"
+                >
                   Year
                 </Label>
-                <Select value={yearSoft} onValueChange={(v) => setYearSoft(v as any)}>
+                <Select
+                  value={yearSoft}
+                  onValueChange={(v) => setYearSoft(v as any)}
+                >
                   <SelectTrigger id="year-soft" className="h-8 w-28">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
@@ -153,3 +188,8 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+// tetap no-SSR karena pakai Radix Select
+export default dynamic(() => Promise.resolve(DashboardPage), {
+  ssr: false,
+});
