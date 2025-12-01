@@ -12,6 +12,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 /* Icons */
 import { CheckCircle2, XCircle } from "lucide-react";
 
+/* Auth & API */
+import { getToken, clearAuth } from "@/lib/auth-storage";
+import { apiChangePassword } from "@/lib/api";
+
 type PasswordRules = {
   minLength: boolean;
   hasLower: boolean;
@@ -64,17 +68,37 @@ export default function ChangePasswordPage() {
       return;
     }
 
+    const token = getToken();
+    if (!token) {
+      // session sudah tidak valid → paksa login ulang
+      clearAuth();
+      router.push("/login");
+      return;
+    }
+
     try {
       setLoading(true);
 
-      await new Promise((r) => setTimeout(r, 700));
+      await apiChangePassword(token, {
+        current_password: oldPassword,
+        new_password: newPassword,
+        new_password_confirmation: confirmPassword,
+      });
 
-      setSuccess("Password berhasil diubah!");
+      setSuccess("Password berhasil diubah. Silakan login kembali.");
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch {
-      setError("Terjadi kesalahan saat mengubah password.");
+
+      // optional: auto-logout setelah beberapa detik
+      setTimeout(() => {
+        clearAuth();
+        router.push("/login");
+      }, 1500);
+    } catch (err: any) {
+      setError(
+        err?.message || "Terjadi kesalahan saat mengubah password."
+      );
     } finally {
       setLoading(false);
     }
@@ -97,7 +121,9 @@ export default function ChangePasswordPage() {
       >
         {error && (
           <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="whitespace-pre-line">
+              {error}
+            </AlertDescription>
           </Alert>
         )}
         {success && (
@@ -114,7 +140,6 @@ export default function ChangePasswordPage() {
             autoComplete="current-password"
             value={oldPassword}
             onChange={(e) => setOldPassword(e.target.value)}
-            className={oldPassword ? "border-green-500" : ""}
           />
         </div>
 

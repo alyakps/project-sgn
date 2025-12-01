@@ -120,3 +120,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ==== Tambahan: sembunyikan icon mata default di input password ==== */
+
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none !important;
+}
+
+input[type="password"]::-webkit-password-toggle-button,
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="password"]::-webkit-textfield-decoration-container {
+  display: none !important;
+  appearance: none !important;
+}

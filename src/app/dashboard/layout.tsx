@@ -30,6 +30,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+/* 🔐 auth helpers */
+import { getUser, clearAuth, getToken } from "@/lib/auth-storage";
+import { getFirstName } from "@/lib/competency";
+import { apiLogout } from "@/lib/api";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 export default function DashboardLayout({
   children,
 }: {
@@ -58,8 +65,6 @@ export default function DashboardLayout({
               "flex flex-col",
             ].join(" ")}
           >
-            {/* (header 'PROJECT' dihapus, brand ada di top bar) */}
-
             {/* Items */}
             <div className="flex-1 flex flex-col gap-2 md:gap-2.5 overflow-hidden">
               <SidebarItem
@@ -100,6 +105,7 @@ export default function DashboardLayout({
                 icon={<User className="h-5 w-5" />}
               />
 
+              {/* ini cuma link ke "/" biasa, logout yang bener lewat top bar */}
               <SidebarItem
                 href="/"
                 label="Logout"
@@ -157,18 +163,96 @@ function SidebarItem({
   );
 }
 
-/* ===== TOP BAR (Persona Talent + avatar kanan) ===== */
+/* ===== TOP BAR (Persona Talent + avatar kanan, pakai data user + summary API) ===== */
 
 function TopBar() {
   const router = useRouter();
 
-  const userName = "Muchammad Hardhiaz Maulana Putra";
-  const avatarUrl = "/avatar.png";
-  const firstInitial = userName.charAt(0).toUpperCase();
+  const [name, setName] = React.useState<string>("User");
+  const [subtitle, setSubtitle] = React.useState<string>("Karyawan");
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    // 1) Ambil data dasar dari localStorage (hasil login / auth:me)
+    const user = getUser();
+    if (user) {
+      const fullName = user.name || "User";
+      setName(fullName);
+
+      const jabatan =
+        user.jabatan_terakhir ||
+        user.role ||
+        user.unit_kerja ||
+        user.unit ||
+        "Karyawan";
+      setSubtitle(jabatan);
+
+      if (user.photo_url) {
+        setAvatarUrl(user.photo_url);
+      } else if (user.profile?.photo_url) {
+        setAvatarUrl(user.profile.photo_url);
+      }
+    }
+
+    // 2) Sinkron dengan data summary (supaya sama kaya ProfileCard)
+    const token = getToken();
+    if (!token || !API_URL) return;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/dashboard/karyawan/summary`, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const json = await res.json().catch(() => ({} as any));
+        if (!res.ok) return;
+
+        const data = (json as any).data ?? json;
+        const profile = data.profile ?? {};
+
+        if (profile.name) setName(profile.name);
+
+        if (profile.jabatan || profile.unit_kerja) {
+          setSubtitle(profile.jabatan || profile.unit_kerja || "Karyawan");
+        }
+
+        if (profile.photo_url) {
+          setAvatarUrl(profile.photo_url);
+        }
+      } catch (err) {
+        console.error("Failed to sync topbar profile:", err);
+      }
+    })();
+  }, []);
+
+  const firstName = getFirstName(name);
+  const firstInitial = firstName.charAt(0).toUpperCase() || "U";
+
+  // hanya pakai AvatarImage kalau string-nya beneran ada
+  const safeAvatarUrl =
+    avatarUrl && avatarUrl.trim() !== "" ? avatarUrl : undefined;
 
   const handleGoProfile = () => router.push("/dashboard/profile");
   const handleChangePassword = () => router.push("/dashboard/password");
-  const handleLogout = () => router.push("/");
+
+  const handleLogout = async () => {
+    try {
+      const token = getToken();
+      if (token) {
+        await apiLogout(token);
+      }
+    } catch (err) {
+      console.error("Logout error:", err);
+      // tetap lanjut clear auth di finally
+    } finally {
+      clearAuth();
+      router.push("/login");
+    }
+  };
 
   return (
     <div className="flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4 sm:px-6 md:px-8">
@@ -185,17 +269,21 @@ function TopBar() {
             variant="ghost"
             className="relative h-10 w-10 rounded-full p-0"
           >
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={avatarUrl} alt={userName} />
-              <AvatarFallback>{firstInitial}</AvatarFallback>
+            <Avatar className="h-10 w-10 border border-zinc-300 overflow-hidden">
+              {safeAvatarUrl && <AvatarImage src={safeAvatarUrl} alt={name} />}
+              <AvatarFallback className="flex h-full w-full items-center justify-center rounded-full bg-zinc-200 text-zinc-700 text-sm font-semibold">
+                {firstInitial}
+              </AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>
             <div className="flex flex-col">
-              <span className="text-sm font-medium truncate">{userName}</span>
-              <span className="text-xs text-muted-foreground">Alumni</span>
+              <span className="text-sm font-medium truncate">{name}</span>
+              <span className="text-xs text-muted-foreground truncate">
+                {subtitle}
+              </span>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />

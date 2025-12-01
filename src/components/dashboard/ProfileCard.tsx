@@ -5,7 +5,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 type Props = {
   name: string;
-  avatarUrl?: string;
+  avatarUrl?: string | null;
   empNo: string;
   title: string;
   unit: string;
@@ -13,7 +13,7 @@ type Props = {
 
 export default function ProfileCard({
   name,
-  avatarUrl = "/avatar.png",
+  avatarUrl,
   empNo,
   title,
   unit,
@@ -23,7 +23,12 @@ export default function ProfileCard({
       .split(" ")
       .map((s) => s[0])
       .join("")
-      .slice(0, 2) || "U";
+      .slice(0, 2)
+      .toUpperCase() || "U";
+
+  // hanya pakai url kalau benar2 ada dan bukan string kosong
+  const safeAvatarUrl =
+    avatarUrl && avatarUrl.trim() !== "" ? avatarUrl : undefined;
 
   return (
     <Card className="rounded-xl border border-zinc-200">
@@ -31,10 +36,12 @@ export default function ProfileCard({
         {/* Desktop */}
         <div className="hidden sm:grid sm:grid-cols-[auto_1fr_1fr] items-center gap-y-4 gap-x-3">
           <div className="flex items-center justify-start">
-            <Avatar className="h-24 w-24 rounded-full ring-4 ring-white shadow-xl">
-              <AvatarImage src={avatarUrl} alt={name} />
-              <AvatarFallback>{initials}</AvatarFallback>
-            </Avatar>
+          <Avatar className="h-24 w-24 rounded-full ring-4 ring-white shadow-xl overflow-hidden">
+            {safeAvatarUrl && <AvatarImage src={safeAvatarUrl} alt={name} />}
+            <AvatarFallback className="flex h-full w-full items-center justify-center rounded-full bg-zinc-200 text-zinc-700 text-3xl font-bold">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
           </div>
 
           <div className="flex flex-col justify-center pl-4">
@@ -63,9 +70,11 @@ export default function ProfileCard({
         {/* Mobile */}
         <div className="sm:hidden space-y-4">
           <div className="flex justify-start">
-            <Avatar className="h-24 w-24 rounded-full ring-4 ring-white shadow-xl">
-              <AvatarImage src={avatarUrl} alt={name} />
-              <AvatarFallback>{initials}</AvatarFallback>
+            <Avatar className="h-24 w-24 rounded-full ring-4 ring-white shadow-xl overflow-hidden">
+              {safeAvatarUrl && <AvatarImage src={safeAvatarUrl} alt={name} />}
+              <AvatarFallback className="bg-[#05398f] text-white text-xl font-semibold">
+                {initials}
+              </AvatarFallback>
             </Avatar>
           </div>
 

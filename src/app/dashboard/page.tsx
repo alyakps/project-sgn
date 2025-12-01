@@ -3,14 +3,10 @@
 import * as React from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+
 import ProfileCard from "@/components/dashboard/ProfileCard";
 import ProgressSummaryCard from "@/components/dashboard/ProgressSummaryCard";
 
-import type { HardRow, SoftRow } from "@/types/competency";
-import { useCompetencyStats } from "@/app/hooks/useCompetencyStats";
-import { getFirstName } from "@/lib/competency";
-
-/* shadcn/ui */
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -20,126 +16,217 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 
-/* ======= USER INFO ======= */
-const EMP_NAME = "Muchammad Hardhiaz Maulana Putra";
-const EMP_AVATAR = "/avatar.png";
-const EMP_NO = "5025211018";
-const EMP_TITLE = "UX/UI Designer";
-const EMP_UNIT = "Divisi Produk Digital";
+import { getUser, getToken, clearAuth } from "@/lib/auth-storage";
+import { apiKaryawanSummary } from "@/lib/api";
+import { getFirstName } from "@/lib/competency";
 
-/* ======= HARD COMPETENCY DATA ======= */
-const DATA: HardRow[] = [
-  { id: "1", status: "Tercapai", nilai: 92 },
-  { id: "2", status: "Tidak Tercapai", nilai: 61 },
-  { id: "3", status: "Tercapai", nilai: 95 },
-  { id: "4", status: "Tidak Tercapai", nilai: 39 },
-];
-
-/* ======= SOFT COMPETENCY DATA ======= */
-const SOFT: SoftRow[] = [
-  { avg: 88 }, { avg: 80 }, { avg: 78 }, { avg: 84 }, { avg: 86 }, { avg: 75 },
-  { avg: 82 }, { avg: 79 }, { avg: 91 }, { avg: 73 }, { avg: 77 }, { avg: 85 },
-  { avg: 83 }, { avg: 76 }, { avg: 90 }, { avg: 79 }, { avg: 87 },
-];
-
-/* ======= YEAR FILTER ======= */
-const YEAR_OPTIONS = ["All", "2022", "2023", "2024"] as const;
-const HARD_YEAR: (typeof YEAR_OPTIONS)[number][] = [
-  "2022",
-  "2023",
-  "2023",
-  "2024",
-];
-const SOFT_YEAR: (typeof YEAR_OPTIONS)[number][] = [
-  "2022",
-  "2022",
-  "2022",
-  "2023",
-  "2023",
-  "2023",
-  "2023",
-  "2023",
-  "2024",
-  "2024",
-  "2024",
-  "2024",
-  "2024",
-  "2024",
-  "2024",
-  "2024",
-  "2024",
-];
+type SummaryBox = {
+  total: number;
+  tercapai: number;
+  tidakTercapai: number;
+  avg: number;
+};
 
 function DashboardPage() {
   const router = useRouter();
-  const firstName = getFirstName(EMP_NAME);
 
-  const [yearHard, setYearHard] = React.useState<
-    (typeof YEAR_OPTIONS)[number]
-  >("All");
-  const [yearSoft, setYearSoft] = React.useState<
-    (typeof YEAR_OPTIONS)[number]
-  >("All");
+  const [loadingAuth, setLoadingAuth] = React.useState(true);
+  const [loadingSummary, setLoadingSummary] = React.useState(true);
+  const [errorSummary, setErrorSummary] = React.useState<string | null>(null);
 
-  const filteredHard = React.useMemo(
-    () => DATA.filter((_, i) => yearHard === "All" || HARD_YEAR[i] === yearHard),
-    [yearHard]
+  // ==== FILTER TAHUN ====
+  const [yearOptions, setYearOptions] = React.useState<number[]>([]);
+  const [selectedYear, setSelectedYear] = React.useState<"all" | number>("all");
+
+  // ==== DATA USER ====
+  const [userName, setUserName] = React.useState<string>("Karyawan");
+  const [empNo, setEmpNo] = React.useState<string>("-");
+  const [empTitle, setEmpTitle] = React.useState<string>("Karyawan");
+  const [empUnit, setEmpUnit] = React.useState<string>("Unit / Divisi");
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
+
+  // ==== DATA SUMMARY ====
+  const [hardSummary, setHardSummary] = React.useState<SummaryBox>({
+    total: 0,
+    tercapai: 0,
+    tidakTercapai: 0,
+    avg: 0,
+  });
+
+  const [softSummary, setSoftSummary] = React.useState<SummaryBox>({
+    total: 0,
+    tercapai: 0,
+    tidakTercapai: 0,
+    avg: 0,
+  });
+
+  // ========= CEK LOGIN & ROLE =========
+  React.useEffect(() => {
+    const token = getToken();
+    const user = getUser();
+
+    if (!token || !user) {
+      clearAuth();
+      router.push("/login");
+      return;
+    }
+
+    if (user.role && user.role !== "karyawan") {
+      router.push("/admin/dashboard");
+      return;
+    }
+
+    setUserName(user.name || "Karyawan");
+    setEmpNo(user.nik || "-");
+    setEmpTitle(user.jabatan_terakhir || user.role || "Karyawan");
+    setEmpUnit(user.unit || "Unit / Divisi");
+
+    // kalau di local storage sudah ada foto, pakai dulu
+    if (user.photo_url) {
+      setAvatarUrl(user.photo_url);
+    } else if (user.profile?.photo_url) {
+      setAvatarUrl(user.profile.photo_url);
+    } else {
+      setAvatarUrl(null);
+    }
+
+    setLoadingAuth(false);
+  }, [router]);
+
+  // ========= AMBIL SUMMARY (bisa dipanggil ulang waktu ganti tahun) =========
+  const loadSummary = React.useCallback(
+    async (tahun: "all" | number) => {
+      const token = getToken();
+      if (!token) return;
+
+      setLoadingSummary(true);
+      setErrorSummary(null);
+
+      try {
+        const data: any = await apiKaryawanSummary(token, tahun);
+
+        const profile = data.profile ?? {};
+
+        if (profile.name) setUserName(profile.name);
+        if (profile.nik) setEmpNo(profile.nik);
+        if (profile.jabatan) setEmpTitle(profile.jabatan);
+        if (profile.unit_kerja) setEmpUnit(profile.unit_kerja);
+
+        if (profile.photo_url) {
+          setAvatarUrl(profile.photo_url);
+        } else {
+          setAvatarUrl(null);
+        }
+
+        const yearsFromApi: number[] = (data.available_years ?? []).map(
+          (y: any) => Number(y)
+        );
+        setYearOptions(yearsFromApi);
+
+        const hard = data.hard_competency ?? {};
+        const hardStatus = hard.status_counts ?? {};
+        setHardSummary({
+          total: Number(hard.total ?? 0),
+          tercapai: Number(hardStatus.tercapai ?? 0),
+          tidakTercapai: Number(hardStatus.tidak_tercapai ?? 0),
+          avg: Number(hard.avg_nilai ?? 0),
+        });
+
+        const soft = data.soft_competency ?? {};
+        const softStatus = soft.status_counts ?? {};
+        setSoftSummary({
+          total: Number(soft.total ?? 0),
+          tercapai: Number(softStatus.tercapai ?? 0),
+          tidakTercapai: Number(softStatus.tidak_tercapai ?? 0),
+          avg: Number(soft.avg_nilai ?? 0),
+        });
+      } catch (err: any) {
+        console.error(err);
+        setErrorSummary(err.message || "Gagal mengambil summary");
+      } finally {
+        setLoadingSummary(false);
+      }
+    },
+    []
   );
-  const filteredSoft = React.useMemo(
-    () => SOFT.filter((_, i) => yearSoft === "All" || SOFT_YEAR[i] === yearSoft),
-    [yearSoft]
-  );
 
-  const { hard, soft } = useCompetencyStats(filteredHard, filteredSoft);
+  // pertama kali: all year
+  React.useEffect(() => {
+    if (!loadingAuth) {
+      loadSummary("all");
+    }
+  }, [loadingAuth, loadSummary]);
+
+  const firstName = getFirstName(userName);
+  const selectValue =
+    selectedYear === "all" ? "all" : String(selectedYear ?? "all");
+
+  if (loadingAuth) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center text-sm text-muted-foreground">
+        Memuat dashboard...
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ===== WRAPPER KONTEN ===== */}
       <div className="space-y-4">
-        {/* Heading saja */}
         <header>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight text-zinc-900">
             Welcome, {firstName}
           </h1>
         </header>
 
-        {/* Profile */}
+        {/* 🔹 Di sini pakai avatarUrl dari state, BUKAN "/avatar.png" */}
         <ProfileCard
-          name={EMP_NAME}
-          avatarUrl={EMP_AVATAR}
-          empNo={EMP_NO}
-          title={EMP_TITLE}
-          unit={EMP_UNIT}
+          name={userName}
+          avatarUrl={avatarUrl}
+          empNo={empNo}
+          title={empTitle}
+          unit={empUnit}
         />
 
-        {/* Summary Cards */}
+        {errorSummary && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+            {errorSummary}
+          </p>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* HARD */}
           <ProgressSummaryCard
             title="Progress – Hard Competency"
-            totalItems={filteredHard.length}
-            achieved={hard.achieved}
-            notAchieved={hard.notAchieved}
-            average={hard.average}
+            totalItems={hardSummary.total}
+            achieved={hardSummary.tercapai}
+            notAchieved={hardSummary.tidakTercapai}
+            average={hardSummary.avg}
             onClick={() => router.push("/dashboard/hard")}
             filterSlot={
               <div className="flex items-center gap-2">
                 <Label
-                  htmlFor="year-hard"
+                  htmlFor="year-filter"
                   className="text-xs text-muted-foreground"
                 >
                   Year
                 </Label>
                 <Select
-                  value={yearHard}
-                  onValueChange={(v) => setYearHard(v as any)}
+                  value={selectValue}
+                  onValueChange={async (v) => {
+                    const tahun = v === "all" ? "all" : Number(v);
+                    setSelectedYear(tahun);
+                    await loadSummary(tahun);
+                  }}
+                  disabled={loadingSummary || yearOptions.length === 0}
                 >
-                  <SelectTrigger id="year-hard" className="h-8 w-28">
+                  <SelectTrigger id="year-filter" className="h-8 w-28">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent align="end">
-                    {YEAR_OPTIONS.map((y) => (
-                      <SelectItem key={y} value={y}>
+                    {yearOptions.length > 1 && (
+                      <SelectItem value="all">All</SelectItem>
+                    )}
+                    {yearOptions.map((y) => (
+                      <SelectItem key={y} value={String(y)}>
                         {y}
                       </SelectItem>
                     ))}
@@ -149,32 +236,39 @@ function DashboardPage() {
             }
           />
 
-          {/* SOFT */}
           <ProgressSummaryCard
             title="Progress – Soft Competency"
-            totalItems={filteredSoft.length}
-            achieved={soft.achieved}
-            notAchieved={soft.notAchieved}
-            average={soft.average}
+            totalItems={softSummary.total}
+            achieved={softSummary.tercapai}
+            notAchieved={softSummary.tidakTercapai}
+            average={softSummary.avg}
             onClick={() => router.push("/dashboard/soft")}
             filterSlot={
               <div className="flex items-center gap-2">
                 <Label
-                  htmlFor="year-soft"
+                  htmlFor="year-filter-soft"
                   className="text-xs text-muted-foreground"
                 >
                   Year
                 </Label>
                 <Select
-                  value={yearSoft}
-                  onValueChange={(v) => setYearSoft(v as any)}
+                  value={selectValue}
+                  onValueChange={async (v) => {
+                    const tahun = v === "all" ? "all" : Number(v);
+                    setSelectedYear(tahun);
+                    await loadSummary(tahun);
+                  }}
+                  disabled={loadingSummary || yearOptions.length === 0}
                 >
-                  <SelectTrigger id="year-soft" className="h-8 w-28">
+                  <SelectTrigger id="year-filter-soft" className="h-8 w-28">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent align="end">
-                    {YEAR_OPTIONS.map((y) => (
-                      <SelectItem key={y} value={y}>
+                    {yearOptions.length > 1 && (
+                      <SelectItem value="all">All</SelectItem>
+                    )}
+                    {yearOptions.map((y) => (
+                      <SelectItem key={y} value={String(y)}>
                         {y}
                       </SelectItem>
                     ))}
@@ -189,7 +283,6 @@ function DashboardPage() {
   );
 }
 
-// tetap no-SSR karena pakai Radix Select
 export default dynamic(() => Promise.resolve(DashboardPage), {
   ssr: false,
 });

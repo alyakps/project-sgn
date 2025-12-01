@@ -1,3 +1,4 @@
+// src/app/dashboard/soft-competency/page.tsx (misal pathmu ini)
 "use client";
 
 import * as React from "react";
@@ -11,6 +12,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -21,73 +23,186 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 
-type Row = {
-  id: string;
+import { getToken } from "@/lib/auth-storage";
+
+// =======================
+// TYPE DEFINITIONS
+// =======================
+type ChartItem = {
+  id_kompetensi: string;
   kode: string;
-  label: string;
-  nama: string;
-  status: "Tercapai" | "Tidak Tercapai";
+  nama_kompetensi: string;
+  your_score: number;
+  your_level: string;
+  avg_employee_score: number | null;
+  avg_level: string | null;
+};
+
+type Item = {
+  id_kompetensi: string;
+  kode: string;
+  nama_kompetensi: string;
+  status: string;
   nilai: number;
-  deskripsi: string;
+  level: string;
+  deskripsi: string | null;
 };
 
-const ALL: Row[] = [
-  { id: "964", kode: "CIN", label: "Creativity & Innovation", nama: "Creativity & Innovation (Kreativitas dan Inovasi)", status: "Tidak Tercapai", nilai: 60, deskripsi: "Lorem ipsum dolor sit amet, consectetur adipiscing elit." },
-  { id: "965", kode: "TRL", label: "Transformational Leadership", nama: "Transformational Leadership (Kepemimpinan Transformasi)", status: "Tercapai", nilai: 100, deskripsi: "Ut enim ad minim veniam, quis nostrud exercitation ullamco." },
-  { id: "966", kode: "NEP", label: "Empowering People", nama: "Nurturing and Empowering People (Membina dan Memberdayakan Orang lain)", status: "Tercapai", nilai: 98, deskripsi: "Duis aute irure dolor in reprehenderit in voluptate velit esse." },
-  { id: "950", kode: "INF", label: "Information Seeking", nama: "Information Seeking (Pencarian Informasi)", status: "Tercapai", nilai: 77, deskripsi: "Cillum dolore eu fugiat nulla pariatur, excepteur sint." },
-  { id: "951", kode: "RSL", label: "Resilience", nama: "Resilience (Ketangguhan)", status: "Tercapai", nilai: 88, deskripsi: "Occaecat cupidatat non proident, sunt in culpa qui." },
-  { id: "952", kode: "ACH", label: "Achievement Orientation", nama: "Achievement Orientation (Orientasi Berprestasi)", status: "Tercapai", nilai: 97, deskripsi: "Officia deserunt mollit anim id est laborum." },
-  { id: "953", kode: "CFO", label: "Concern For Order", nama: "Concern For Order (Ketepatan)", status: "Tercapai", nilai: 79, deskripsi: "Pellentesque habitant morbi tristique senectus et netus." },
-  { id: "954", kode: "ORC", label: "Organizational Commitment", nama: "Organizational Commitment (Komitmen Organisasi)", status: "Tidak Tercapai", nilai: 69, deskripsi: "Integer posuere erat a ante venenatis dapibus posuere." },
-  { id: "955", kode: "ETO", label: "Ethical Oriented", nama: "Ethical Oriented (Kesadaran Beretika)", status: "Tercapai", nilai: 79, deskripsi: "Aenean lacinia bibendum nulla sed consectetur." },
-  { id: "956", kode: "MED", label: "Managing Equality & Diversity", nama: "Managing Equality & Diversity (Pengelolaan Kesetaraan dan Keberagaman)", status: "Tercapai", nilai: 73, deskripsi: "Vivamus sagittis lacus vel augue laoreet rutrum." },
-  { id: "957", kode: "BCR", label: "Building Collaborative Relationship", nama: "Building Collaborative Relationship (Membangun Hubungan Kerjasama)", status: "Tercapai", nilai: 95, deskripsi: "Cras mattis consectetur purus sit amet fermentum." },
-  { id: "958", kode: "BSV", label: "Business Savvy", nama: "Business Savvy (Kecerdasan Bisnis)", status: "Tercapai", nilai: 86, deskripsi: "Maecenas sed diam eget risus varius blandit." },
-  { id: "959", kode: "CSF", label: "Customer Focus", nama: "Customer Focus (Orientasi Pelanggan)", status: "Tercapai", nilai: 78, deskripsi: "Sed posuere consectetur est at lobortis." },
-  { id: "960", kode: "STO", label: "Strategic Orientation", nama: "Strategic Orientation (Orientasi Strategis)", status: "Tercapai", nilai: 100, deskripsi: "Etiam porta sem malesuada magna mollis euismod." },
-  { id: "961", kode: "STM", label: "Sustainability Mindset", nama: "Sustainability Mindset (Orientasi Keberlanjutan)", status: "Tercapai", nilai: 79, deskripsi: "Donec id elit non mi porta gravida at eget metus." },
-  { id: "962", kode: "EXF", label: "Execution Focused", nama: "Execution Focused (Fokus pada Pelaksanaan)", status: "Tercapai", nilai: 93, deskripsi: "Curabitur blandit tempus porttitor." },
-  { id: "963", kode: "DGL", label: "Digital Literate", nama: "Digital Literate (Pemahaman Digital)", status: "Tercapai", nilai: 82, deskripsi: "Praesent commodo cursus magna, vel scelerisque nisl." },
-];
-
-const AVG_BY_KODE: Record<string, number> = {
-  CIN: 82, TRL: 79, NEP: 81, INF: 75, RSL: 84, ACH: 80, CFO: 76, ORC: 72, ETO: 85,
-  MED: 70, BCR: 88, BSV: 83, CSF: 80, STO: 78, STM: 86, EXF: 82, DGL: 85,
+type ApiResponse = {
+  data: {
+    nik: string;
+    tahun: number | null;
+    chart: ChartItem[];
+    items: Item[];
+    available_years?: number[];
+  };
 };
+
+const API_BASE_URL =
+  (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000").replace(
+    /\/$/,
+    ""
+  ) + "/api";
 
 const band = (v: number) => (v >= 86 ? "High" : v >= 70 ? "Middle" : "Low");
 
+function formatStatus(status: string) {
+  const lower = status.toLowerCase();
+  if (lower === "tercapai") return "Tercapai";
+  if (lower === "tidak tercapai") return "Tidak Tercapai";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
 export default function SoftCompetencyPage() {
   const [openId, setOpenId] = React.useState<string | null>(null);
-  const [year, setYear] = React.useState("2025");
-  const years = ["2025", "2024", "2023", "2022"];
+
+  // tahun yang dipilih user
+  const [year, setYear] = React.useState<string>("");
+
+  // daftar tahun dari backend
+  const [availableYears, setAvailableYears] = React.useState<string[]>([]);
+
+  const [chart, setChart] = React.useState<ChartItem[]>([]);
+  const [items, setItems] = React.useState<Item[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // =======================
+  //   FETCH DATA
+  // =======================
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const params = new URLSearchParams();
+        if (year) {
+          params.set("tahun", year);
+        }
+
+        const queryString = params.toString();
+        const url =
+          `${API_BASE_URL}/karyawan/soft-competencies` +
+          (queryString ? `?${queryString}` : "");
+
+        const headers: HeadersInit = {
+          Accept: "application/json",
+        };
+
+        const token = getToken();
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        const res = await fetch(url, {
+          method: "GET",
+          headers,
+        });
+
+        if (!res.ok) {
+          let msg = `Failed: ${res.status}`;
+          try {
+            const e = await res.json();
+            if (e?.message) msg += ` - ${e.message}`;
+          } catch {
+            // ignore non-json
+          }
+          throw new Error(msg);
+        }
+
+        const json: ApiResponse = await res.json();
+        if (cancelled) return;
+
+        // ambil daftar tahun dari backend
+        const yearsFromApi =
+          json.data.available_years
+            ?.filter((v) => typeof v === "number")
+            .map((v) => String(v)) ?? [];
+
+        setAvailableYears(yearsFromApi);
+
+        // kalau belum ada year yg dipilih, auto pilih yang terbaru
+        if (!year && yearsFromApi.length > 0) {
+          setYear(yearsFromApi[0]);
+        }
+
+        setChart(json.data?.chart ?? []);
+        setItems(json.data?.items ?? []);
+        setOpenId(null);
+      } catch (err: any) {
+        if (cancelled) return;
+        setError(err.message ?? "Failed to fetch");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+    // year sebagai dependency → setiap ganti tahun, refetch
+  }, [year]);
 
   const radarData = React.useMemo(
     () =>
-      ALL.map((d) => ({
+      chart.map((d) => ({
         kode: d.kode,
-        label: d.label,
-        value: d.nilai,
-        avg: AVG_BY_KODE[d.kode] ?? 0,
+        label: d.nama_kompetensi,
+        value: d.your_score,
+        avg: d.avg_employee_score ?? 0,
+        your_level: d.your_level,
+        avg_level: d.avg_level,
       })),
-    []
+    [chart]
   );
+
+  const hasData = radarData.length > 0;
 
   return (
     <section className="flex flex-col gap-3">
-      {/* ===== HEADER + FILTER ===== */}
+      {/* HEADER */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-5 pb-0">
         <h2 className="text-lg sm:text-xl font-semibold">Soft Competency</h2>
 
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-zinc-700">Tahun:</span>
-          <Select value={year} onValueChange={setYear}>
+          <Select
+            value={year || ""}
+            onValueChange={(val) => {
+              setYear(val);
+              setOpenId(null);
+            }}
+          >
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Pilih tahun" />
             </SelectTrigger>
             <SelectContent position="popper" className="z-50">
-              {years.map((y) => (
+              {availableYears.map((y) => (
                 <SelectItem key={y} value={y}>
                   {y}
                 </SelectItem>
@@ -97,51 +212,123 @@ export default function SoftCompetencyPage() {
         </div>
       </div>
 
-      {/* ===== RADAR CHART ===== */}
+      {loading && (
+        <p className="px-3 sm:px-5 text-xs sm:text-sm text-zinc-500">
+          Memuat data soft competency...
+        </p>
+      )}
+      {error && (
+        <p className="px-3 sm:px-5 text-xs sm:text-sm text-red-600">{error}</p>
+      )}
+
+      {/* ====================== CHART ====================== */}
       <div className="px-3 sm:px-5">
-        <div className="h-[380px] w-full">
+        <div className="relative h-[380px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={radarData} outerRadius="75%">
-              <PolarGrid gridType="polygon" />
-              <PolarAngleAxis dataKey="kode" tick={{ fontSize: 11 }} />
-              <PolarRadiusAxis angle={30} domain={[0, 100]} tickCount={5} tick={{ fontSize: 10 }} />
-              <Radar name="Your Score" dataKey="value" stroke="#16a34a" fill="#16a34a" fillOpacity={0.25} />
-              <Radar name="Average Employee Score" dataKey="avg" stroke="#2563eb" fill="#2563eb" fillOpacity={0.15} />
-              <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} />
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null;
-                  const kode = String(payload[0].payload.kode);
-                  const label = String(payload[0].payload.label);
-                  const vUser = Number(payload.find((p) => p.dataKey === "value")?.value ?? 0);
-                  const vAvg = Number(payload.find((p) => p.dataKey === "avg")?.value ?? 0);
-                  return (
-                    <div className="rounded bg-white px-3 py-2 text-xs shadow">
-                      <div className="font-semibold">{label}</div>
-                      <div className="text-zinc-600">
-                        Kode: <span className="font-medium">{kode}</span>
-                      </div>
-                      <div className="mt-1 space-y-0.5">
-                        <div>
-                          Your Score: <span className="font-semibold">{vUser}</span> ({band(vUser)})
+            {hasData ? (
+              <RadarChart data={radarData} outerRadius="75%">
+                <PolarGrid gridType="polygon" />
+                <PolarAngleAxis dataKey="kode" tick={{ fontSize: 11 }} />
+                <PolarRadiusAxis
+                  angle={30}
+                  domain={[0, 100]}
+                  tickCount={5}
+                  tick={{ fontSize: 10 }}
+                />
+                <Radar
+                  name="Your Score"
+                  dataKey="value"
+                  stroke="#16a34a"
+                  fill="#16a34a"
+                  fillOpacity={0.25}
+                />
+                <Radar
+                  name="Average Employee Score"
+                  dataKey="avg"
+                  stroke="#2563eb"
+                  fill="#2563eb"
+                  fillOpacity={0.15}
+                />
+                <Legend
+                  verticalAlign="top"
+                  align="center"
+                  wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
+                />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null;
+                    const p = payload[0] as any;
+
+                    const kode = p?.payload?.kode ?? "";
+                    const label = p?.payload?.label ?? "";
+                    const score = Number(
+                      payload.find((x: any) => x.dataKey === "value")?.value ??
+                        0
+                    );
+                    const avg = Number(
+                      payload.find((x: any) => x.dataKey === "avg")?.value ?? 0
+                    );
+
+                    return (
+                      <div className="rounded bg-white px-3 py-2 text-xs shadow">
+                        <div className="font-semibold">{label}</div>
+                        <div className="text-zinc-600">
+                          Kode: <span className="font-medium">{kode}</span>
                         </div>
-                        <div>
-                          Average Score: <span className="font-semibold">{vAvg}</span>
+                        <div className="mt-1 space-y-0.5">
+                          <div>
+                            Your Score:{" "}
+                            <span className="font-semibold">{score}</span> (
+                            {band(score)})
+                          </div>
+                          <div>
+                            Average Score:{" "}
+                            <span className="font-semibold">{avg}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                }}
-              />
-            </RadarChart>
+                    );
+                  }}
+                />
+              </RadarChart>
+            ) : (
+              <RadarChart
+                data={[
+                  { kode: "A", value: 0 },
+                  { kode: "B", value: 0 },
+                  { kode: "C", value: 0 },
+                  { kode: "D", value: 0 },
+                  { kode: "E", value: 0 },
+                ]}
+                outerRadius="75%"
+              >
+                <PolarGrid gridType="polygon" />
+                <PolarAngleAxis dataKey="kode" tick={{ fontSize: 11 }} />
+                <PolarRadiusAxis
+                  angle={30}
+                  domain={[0, 100]}
+                  tickCount={5}
+                  tick={{ fontSize: 10 }}
+                />
+              </RadarChart>
+            )}
           </ResponsiveContainer>
+
+          {!hasData && !loading && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <p className="rounded-md bg-white/80 px-3 py-2 text-xs sm:text-sm text-zinc-600">
+                {availableYears.length === 0
+                  ? "Belum ada data soft competency."
+                  : "Pilih tahun untuk melihat data."}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ===== SEPARATOR ===== */}
       <Separator className="my-2 bg-zinc-200" />
 
-      {/* ===== TABLE ===== */}
+      {/* ====================== TABLE ====================== */}
       <div className="p-4 sm:p-6">
         <div className="w-full overflow-x-auto">
           <table className="w-full text-sm sm:text-[15px]">
@@ -156,24 +343,32 @@ export default function SoftCompetencyPage() {
               </tr>
             </thead>
             <tbody>
-              {ALL.map((r, i) => {
-                const open = openId === r.id;
+              {items.map((r, i) => {
+                const open = openId === r.id_kompetensi;
+                const statusLabel = formatStatus(r.status);
+                const isTercapai = statusLabel === "Tercapai";
+
                 return (
-                  <React.Fragment key={r.id}>
-                    <tr className={`border-b transition ${open ? "bg-zinc-50" : "hover:bg-zinc-50"}`}>
+                  // ⬅️ KEY HARUS UNIK: id + index
+                  <React.Fragment key={`${r.id_kompetensi}-${i}`}>
+                    <tr
+                      className={`border-b transition ${
+                        open ? "bg-zinc-50" : "hover:bg-zinc-50"
+                      }`}
+                    >
                       <td className="py-3 px-2 text-center">{i + 1}</td>
                       <td className="py-3 px-2 font-semibold">{r.kode}</td>
-                      <td className="py-3 px-2">{r.nama}</td>
+                      <td className="py-3 px-2">{r.nama_kompetensi}</td>
                       <td className="py-3 px-2 text-center">
                         <span
                           className={[
                             "inline-flex items-center rounded-full px-3 py-1 text-[13px] font-medium ring-1",
-                            r.status === "Tercapai"
+                            isTercapai
                               ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
                               : "bg-amber-50 text-amber-700 ring-amber-200",
                           ].join(" ")}
                         >
-                          {r.status}
+                          {statusLabel}
                         </span>
                       </td>
                       <td className="py-3 px-2 text-center">{r.nilai}</td>
@@ -181,7 +376,9 @@ export default function SoftCompetencyPage() {
                         <Button
                           size="sm"
                           className="h-9 rounded-lg px-4 text-[13px] font-semibold"
-                          onClick={() => setOpenId(open ? null : r.id)}
+                          onClick={() =>
+                            setOpenId(open ? null : r.id_kompetensi)
+                          }
                         >
                           {open ? "Tutup" : "Detail"}
                         </Button>
@@ -196,21 +393,33 @@ export default function SoftCompetencyPage() {
                               <div className="grid gap-3 sm:grid-cols-2">
                                 <div>
                                   <p className="text-xs text-zinc-500">ID</p>
-                                  <p className="text-[15px] font-semibold">{r.id}</p>
+                                  <p className="text-[15px] font-semibold">
+                                    {r.id_kompetensi}
+                                  </p>
                                 </div>
                                 <div>
                                   <p className="text-xs text-zinc-500">Kode</p>
-                                  <p className="text-[15px] font-semibold">{r.kode}</p>
+                                  <p className="text-[15px] font-semibold">
+                                    {r.kode}
+                                  </p>
                                 </div>
                                 <div className="sm:col-span-2">
-                                  <p className="text-xs text-zinc-500">Kompetensi</p>
-                                  <p className="text-[15px] font-semibold">{r.nama}</p>
+                                  <p className="text-xs text-zinc-500">
+                                    Kompetensi
+                                  </p>
+                                  <p className="text-[15px] font-semibold">
+                                    {r.nama_kompetensi}
+                                  </p>
                                 </div>
                               </div>
 
                               <div className="pt-3 border-t">
-                                <p className="text-xs text-zinc-500 mb-1">Deskripsi</p>
-                                <p className="text-[15px] leading-relaxed">{r.deskripsi}</p>
+                                <p className="text-xs text-zinc-500 mb-1">
+                                  Deskripsi
+                                </p>
+                                <p className="text-[15px] leading-relaxed">
+                                  {r.deskripsi}
+                                </p>
                               </div>
                             </div>
                           </div>
@@ -220,6 +429,19 @@ export default function SoftCompetencyPage() {
                   </React.Fragment>
                 );
               })}
+
+              {!loading && !items.length && (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="py-4 text-center text-sm text-zinc-500"
+                  >
+                    {availableYears.length === 0
+                      ? "Belum ada data soft competency."
+                      : "Tidak ada data ditampilkan untuk tahun ini."}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
