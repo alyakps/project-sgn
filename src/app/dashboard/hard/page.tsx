@@ -48,6 +48,11 @@ function formatStatus(status: string | null | undefined) {
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
+// 🔹 base URL buat summary (sama pattern-nya dengan page lain)
+const API_BASE_URL =
+  (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000")
+    .replace(/\/$/, "") + "/api";
+
 export default function HardCompetencyPage() {
   const router = useRouter();
 
@@ -55,7 +60,7 @@ export default function HardCompetencyPage() {
   const [openSet, setOpenSet] = React.useState<Set<string>>(new Set());
 
   const [yearOptions, setYearOptions] = React.useState<number[]>([]);
-  const [selectedYear, setSelectedYear] = React.useState<"all" | number>("all");
+  const [selectedYear, setSelectedYear] = React.useState<number | null>(null);
 
   const [loadingAuth, setLoadingAuth] = React.useState(true);
   const [loadingData, setLoadingData] = React.useState(false);
@@ -80,9 +85,65 @@ export default function HardCompetencyPage() {
     setLoadingAuth(false);
   }, [router]);
 
-  // ===== LOAD DATA API =====
+  // 🔧 helper normalisasi tahun (ke number, sort desc)
+  const normalizeYears = React.useCallback((raw: any): number[] => {
+    const arr = Array.isArray(raw) ? raw : [];
+    const nums = arr
+      .map((v) => Number(v))
+      .filter((v) => !Number.isNaN(v));
+
+    nums.sort((a, b) => b - a); // terbaru dulu
+    return nums;
+  }, []);
+
+  // ===== LOAD LIST TAHUN (KHUSUS HARD) DARI SUMMARY =====
+  const loadYearOptions = React.useCallback(async () => {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      setError(null);
+
+      const res = await fetch(`${API_BASE_URL}/dashboard/karyawan/summary`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Gagal mengambil daftar tahun (status ${res.status})`);
+      }
+
+      const json: any = await res.json();
+      const data = json.data ?? {};
+
+      const years = normalizeYears(
+        data.available_years_hard ?? data.available_years ?? []
+      );
+
+      setYearOptions(years);
+
+      // set default selectedYear:
+      if (years.length > 0) {
+        setSelectedYear((prev) =>
+          prev !== null && years.includes(prev) ? prev : years[0]
+        );
+      } else {
+        setSelectedYear(null);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "Gagal memuat daftar tahun Hard Competency.");
+      setYearOptions([]);
+      setSelectedYear(null);
+    }
+  }, [normalizeYears]);
+
+  // ===== LOAD DATA HARD LIST =====
   const loadData = React.useCallback(
-    async (tahun: "all" | number) => {
+    async (tahun: number | null) => {
       const token = getToken();
       if (!token) return;
 
@@ -90,10 +151,12 @@ export default function HardCompetencyPage() {
       setError(null);
 
       try {
-        const res = await apiKaryawanHardList(token, tahun);
-        const anyRes: any = res; // <- supaya bebas akses data / years / dll
+        // di API kamu: apiKaryawanHardList(token, tahun)
+        // sekarang kita selalu kirim number (tahun) kalau ada
+        const res: any = await apiKaryawanHardList(token, tahun as any);
+        const anyRes: any = res;
 
-        const items = anyRes.items ?? anyRes.data ?? [];
+        const items = anyRes.items ?? anyRes.data?.items ?? anyRes.data ?? [];
 
         const mapped: Row[] = items.map((item: any) => {
           const rawId =
@@ -133,18 +196,12 @@ export default function HardCompetencyPage() {
         });
 
         setRows(mapped);
-
-        const yearsFromApi: number[] = (
-          anyRes.available_years ??
-          anyRes.years ??
-          []
-        ).map((y: any) => Number(y));
-
-        setYearOptions(yearsFromApi);
         setOpenSet(new Set());
       } catch (err: any) {
         console.error(err);
         setError(err?.message || "Gagal memuat data Hard Competency.");
+        setRows([]);
+        setOpenSet(new Set());
       } finally {
         setLoadingData(false);
       }
@@ -152,11 +209,19 @@ export default function HardCompetencyPage() {
     []
   );
 
+  // 🔹 Setelah auth OK → ambil dulu daftar tahun Hard
   React.useEffect(() => {
     if (!loadingAuth) {
-      loadData("all");
+      loadYearOptions();
     }
-  }, [loadingAuth, loadData]);
+  }, [loadingAuth, loadYearOptions]);
+
+  // 🔹 Kalau selectedYear berubah & valid → baru fetch data Hard
+  React.useEffect(() => {
+    if (selectedYear !== null) {
+      loadData(selectedYear);
+    }
+  }, [selectedYear, loadData]);
 
   const toggleRow = (idKey: string) =>
     setOpenSet((prev) => {
@@ -164,9 +229,6 @@ export default function HardCompetencyPage() {
       next.has(idKey) ? next.delete(idKey) : next.add(idKey);
       return next;
     });
-
-  const yearSelectValue =
-    selectedYear === "all" ? "all" : String(selectedYear ?? "all");
 
   if (loadingAuth) {
     return (
@@ -188,19 +250,21 @@ export default function HardCompetencyPage() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-zinc-700">Tahun:</span>
             <Select
-              value={yearSelectValue}
-              onValueChange={async (v) => {
-                const tahun = v === "all" ? "all" : Number(v);
+              // ❗ tidak ada "all" di sini, jadi value = tahun saja
+              value={
+                selectedYear !== null ? String(selectedYear) : undefined
+              }
+              onValueChange={(v) => {
+                const tahun = Number(v);
                 setSelectedYear(tahun);
-                await loadData(tahun);
+                // loadData akan otomatis dipanggil via useEffect
               }}
-              disabled={loadingData}
+              disabled={loadingData || effectiveYearOptions.length === 0}
             >
               <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="All" />
+                <SelectValue placeholder="Pilih tahun" />
               </SelectTrigger>
               <SelectContent position="popper" className="z-50">
-                <SelectItem value="all">All</SelectItem>
                 {effectiveYearOptions.map((y) => (
                   <SelectItem key={y} value={String(y)}>
                     {y}
@@ -240,7 +304,7 @@ export default function HardCompetencyPage() {
                       colSpan={5}
                       className="py-6 text-center text-sm text-muted-foreground"
                     >
-                      Belum ada data hard competency.
+                      Belum ada data hard competency untuk tahun ini.
                     </td>
                   </tr>
                 )}

@@ -1,4 +1,4 @@
-// src/app/dashboard/soft-competency/page.tsx (misal pathmu ini)
+// src/app/dashboard/soft-competency/page.tsx
 "use client";
 
 import * as React from "react";
@@ -74,7 +74,8 @@ function formatStatus(status: string) {
 }
 
 export default function SoftCompetencyPage() {
-  const [openId, setOpenId] = React.useState<string | null>(null);
+  // const [openId, setOpenId] = React.useState<string | null>(null);
+  const [openIds, setOpenIds] = React.useState<string[]>([]); // ✅ bisa banyak yang kebuka
 
   // tahun yang dipilih user
   const [year, setYear] = React.useState<string>("");
@@ -151,7 +152,8 @@ export default function SoftCompetencyPage() {
 
         setChart(json.data?.chart ?? []);
         setItems(json.data?.items ?? []);
-        setOpenId(null);
+        // setOpenId(null);
+        setOpenIds([]); // ✅ reset semua detail tertutup ketika data reload
       } catch (err: any) {
         if (cancelled) return;
         setError(err.message ?? "Failed to fetch");
@@ -195,7 +197,8 @@ export default function SoftCompetencyPage() {
             value={year || ""}
             onValueChange={(val) => {
               setYear(val);
-              setOpenId(null);
+              // setOpenId(null);
+              setOpenIds([]); // ✅ tutup semua detail saat ganti tahun
             }}
           >
             <SelectTrigger className="w-[140px]">
@@ -344,7 +347,8 @@ export default function SoftCompetencyPage() {
             </thead>
             <tbody>
               {items.map((r, i) => {
-                const open = openId === r.id_kompetensi;
+                // const open = openId === r.id_kompetensi;
+                const open = openIds.includes(r.id_kompetensi); // ✅ cek apakah id ini terbuka
                 const statusLabel = formatStatus(r.status);
                 const isTercapai = statusLabel === "Tercapai";
 
@@ -377,7 +381,13 @@ export default function SoftCompetencyPage() {
                           size="sm"
                           className="h-9 rounded-lg px-4 text-[13px] font-semibold"
                           onClick={() =>
-                            setOpenId(open ? null : r.id_kompetensi)
+                            setOpenIds((prev) =>
+                              prev.includes(r.id_kompetensi)
+                                ? prev.filter(
+                                    (id) => id !== r.id_kompetensi
+                                  ) // ✅ kalau sudah terbuka → tutup
+                                : [...prev, r.id_kompetensi] // ✅ kalau tertutup → buka
+                            )
                           }
                         >
                           {open ? "Tutup" : "Detail"}

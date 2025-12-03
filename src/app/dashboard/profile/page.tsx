@@ -1,207 +1,341 @@
-// src/app/dashboard/profile/page.tsx
 "use client";
 
 import * as React from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { getToken } from "@/lib/auth-storage";
 
-type KeyVal = { label: string; value: string };
+import {
+  KeyVal,
+  MainProfileState,
+  PerformanceState,
+  ProfileFormState,
+} from "@/components/profile/profile-types";
+import { fix, emptyToNull } from "@/components/profile/profile-helpers";
+import { ProfileHeaderCard } from "@/components/profile/ProfileHeaderCard";
+import { ProfilePersonalCard } from "@/components/profile/ProfilePersonalCard";
+import { ProfilePerformanceCard } from "@/components/profile/ProfilePerformanceCard";
+import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 
+// ⬇️ Tambah ini
+import { useQueryClient } from "@tanstack/react-query";
+
+// =======================
+// API TYPES
+// =======================
+type UserApi = {
+  id: number;
+  nik: string;
+  name: string;
+  email: string;
+  role: string;
+};
+
+type ProfileApi = {
+  id: number;
+  photo_url: string | null;
+  nama_lengkap: string | null;
+  gelar_akademik: string | null;
+  nik: string | null;
+  pendidikan: string | null;
+  no_ktp: string | null;
+  tempat_lahir: string | null;
+  tanggal_lahir: string | null;
+  jenis_kelamin: string | null;
+  agama: string | null;
+  jabatan_terakhir: string | null;
+  unit_kerja: string | null;
+  alamat_rumah: string | null;
+  handphone: string | null;
+  email_pribadi: string | null;
+  npwp: string | null;
+  suku: string | null;
+  golongan_darah: string | null;
+  status_perkawinan: string | null;
+  penilaian_kerja: string | null;
+  pencapaian: string | null;
+};
+
+type ProfileApiResponse = {
+  data: {
+    user: UserApi;
+    profile: ProfileApi;
+  };
+};
+
+// =======================
+// CONFIG API
+// =======================
+const API_BASE_URL =
+  (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000").replace(
+    /\/$/,
+    "",
+  ) + "/api";
+
+const UPDATE_PROFILE_URL = `${API_BASE_URL}/karyawan/profile`;
+
+// ======================================================================
+// PAGE
+// ======================================================================
 export default function ProfilePage() {
-  const main = {
-    namaLengkap: "Muchammad Hardhiaz Maulana Putra",
-    jabatanTerakhir: "Backend Developer Intern",
-    nikPn: "5025211018",
-    handphone: "081234567890",
-    email: "andrian.tambunan@example.com",
+  const queryClient = useQueryClient();
+
+  const [main, setMain] = React.useState<MainProfileState>({
+    namaLengkap: "-",
+    jabatanTerakhir: "-",
+    nikPn: "-",
+    handphone: "-",
+    email: "-",
     avatarUrl: "/avatar.png",
-    avatarAlt: "Andrian Tambunan",
-  };
+    avatarAlt: "",
+  });
 
-  const personal: KeyVal[] = [
-    { label: "Gelar Akademik", value: "S.Kom" },
-    { label: "Pendidikan", value: "S1" },
-    { label: "No. KTP", value: "3507091234567890" },
-    { label: "Tempat Lahir", value: "Medan" },
-    { label: "Tanggal Lahir (DD/MM/YY)", value: "25/08/02" },
-    { label: "Jenis Kelamin", value: "Laki-laki" },
-    { label: "Agama", value: "Kristen Protestan" },
-    {
-      label: "Alamat Rumah",
-      value: "Jl. Raya ITS, Keputih, Sukolilo, Surabaya",
-    },
-    { label: "NPWP", value: "123456789012000" },
-    { label: "Suku", value: "Batak" },
-    { label: "Golongan Darah", value: "O" },
-    { label: "Status Perkawinan", value: "Belum Menikah" },
-  ];
+  const [personal, setPersonal] = React.useState<KeyVal[]>([]);
+  const [performance, setPerformance] = React.useState<PerformanceState>({
+    penilaianKerja: [],
+    achievements: [],
+  });
 
-  const performance = {
-    penilaianKerja: [
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-    ],
-    achievements: [
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-    ],
-  };
+  const [form, setForm] = React.useState<ProfileFormState>({
+    jabatanTerakhir: "",
+    gelarAkademik: "",
+    pendidikan: "",
+    noKtp: "",
+    tempatLahir: "",
+    tanggalLahir: "",
+    jenisKelamin: "",
+    agama: "",
+    alamatRumah: "",
+    npwp: "",
+    suku: "",
+    golonganDarah: "",
+    statusPerkawinan: "",
+    handphone: "",
+    emailPribadi: "",
+    penilaianKerja: "",
+    pencapaian: "",
+  });
 
+  const [loading, setLoading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isEditing, setIsEditing] = React.useState(false);
+
+  // ======================================================================
+  // FETCH PROFILE
+  // ======================================================================
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadProfile() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const token = getToken();
+        const res = await fetch(`${API_BASE_URL}/karyawan/profile`, {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const json: ProfileApiResponse = await res.json();
+        if (cancelled) return;
+
+        const user = json.data.user;
+        const p = json.data.profile;
+
+        const nama = p.nama_lengkap || user.name;
+
+        // MAIN STATE
+        const mainState: MainProfileState = {
+          namaLengkap: fix(nama),
+          jabatanTerakhir: fix(p.jabatan_terakhir),
+          nikPn: fix(p.nik || user.nik),
+          handphone: fix(p.handphone),
+          email: fix(p.email_pribadi || user.email),
+          avatarUrl: p.photo_url || "/avatar.png",
+          avatarAlt: fix(nama),
+        };
+        setMain(mainState);
+
+        // FORM STATE
+        setForm({
+          jabatanTerakhir: p.jabatan_terakhir ?? "",
+          gelarAkademik: p.gelar_akademik ?? "",
+          pendidikan: p.pendidikan ?? "",
+          noKtp: p.no_ktp ?? "",
+          tempatLahir: p.tempat_lahir ?? "",
+          tanggalLahir: p.tanggal_lahir ?? "",
+          jenisKelamin: p.jenis_kelamin ?? "",
+          agama: p.agama ?? "",
+          alamatRumah: p.alamat_rumah ?? "",
+          npwp: p.npwp ?? "",
+          suku: p.suku ?? "",
+          golonganDarah: p.golongan_darah ?? "",
+          statusPerkawinan: p.status_perkawinan ?? "",
+          handphone: p.handphone ?? "",
+          emailPribadi: p.email_pribadi ?? user.email,
+          penilaianKerja: p.penilaian_kerja ?? "",
+          pencapaian: p.pencapaian ?? "",
+        });
+
+        // PERSONAL VIEW
+        const personalView: KeyVal[] = [
+          { label: "Gelar Akademik", value: fix(p.gelar_akademik) },
+          { label: "Pendidikan", value: fix(p.pendidikan) },
+          { label: "No. KTP", value: fix(p.no_ktp) },
+          { label: "Tempat Lahir", value: fix(p.tempat_lahir) },
+          { label: "Tanggal Lahir", value: fix(p.tanggal_lahir) },
+          { label: "Jenis Kelamin", value: fix(p.jenis_kelamin) },
+          { label: "Agama", value: fix(p.agama) },
+          { label: "Alamat Rumah", value: fix(p.alamat_rumah) },
+          { label: "NPWP", value: fix(p.npwp) },
+          { label: "Suku", value: fix(p.suku) },
+          { label: "Golongan Darah", value: fix(p.golongan_darah) },
+          { label: "Status Perkawinan", value: fix(p.status_perkawinan) },
+        ];
+        setPersonal(personalView);
+
+        // PERFORMANCE VIEW
+        const perf: PerformanceState = {
+          penilaianKerja: p.penilaian_kerja ? [fix(p.penilaian_kerja)] : ["-"],
+          achievements: p.pencapaian ? [fix(p.pencapaian)] : ["-"],
+        };
+        setPerformance(perf);
+      } catch (err: any) {
+        if (!cancelled) setError(err.message ?? "Gagal memuat profil.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ======================================================================
+  // HANDLE SAVE
+  // ======================================================================
+  async function handleSave() {
+    try {
+      setSaving(true);
+      setError(null);
+
+      const token = getToken();
+
+      const payload = {
+        jabatan_terakhir: emptyToNull(form.jabatanTerakhir),
+        gelar_akademik: emptyToNull(form.gelarAkademik),
+        pendidikan: emptyToNull(form.pendidikan),
+        no_ktp: emptyToNull(form.noKtp),
+        tempat_lahir: emptyToNull(form.tempatLahir),
+        tanggal_lahir: emptyToNull(form.tanggalLahir),
+        jenis_kelamin: emptyToNull(form.jenisKelamin),
+        agama: emptyToNull(form.agama),
+        alamat_rumah: emptyToNull(form.alamatRumah),
+        npwp: emptyToNull(form.npwp),
+        suku: emptyToNull(form.suku),
+        golongan_darah: emptyToNull(form.golonganDarah),
+        status_perkawinan: emptyToNull(form.statusPerkawinan),
+        handphone: emptyToNull(form.handphone),
+        penilaian_kerja: emptyToNull(form.penilaianKerja),
+        pencapaian: emptyToNull(form.pencapaian),
+      };
+
+      const res = await fetch(UPDATE_PROFILE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error("Gagal menyimpan profil.");
+
+      // update view singkat setelah save
+      setMain((prev) => ({
+        ...prev,
+        jabatanTerakhir: fix(form.jabatanTerakhir),
+        handphone: fix(form.handphone),
+      }));
+
+      setPersonal([
+        { label: "Gelar Akademik", value: fix(form.gelarAkademik) },
+        { label: "Pendidikan", value: fix(form.pendidikan) },
+        { label: "No. KTP", value: fix(form.noKtp) },
+        { label: "Tempat Lahir", value: fix(form.tempatLahir) },
+        { label: "Tanggal Lahir", value: fix(form.tanggalLahir) },
+        { label: "Jenis Kelamin", value: fix(form.jenisKelamin) },
+        { label: "Agama", value: fix(form.agama) },
+        { label: "Alamat Rumah", value: fix(form.alamatRumah) },
+        { label: "NPWP", value: fix(form.npwp) },
+        { label: "Suku", value: fix(form.suku) },
+        { label: "Golongan Darah", value: fix(form.golonganDarah) },
+        { label: "Status Perkawinan", value: fix(form.statusPerkawinan) },
+      ]);
+
+      setPerformance({
+        penilaianKerja: [fix(form.penilaianKerja || "-")],
+        achievements: [fix(form.pencapaian || "-")],
+      });
+
+      // ⬇️ Penting: kasih tahu React Query supaya TopBar refetch data profil
+      queryClient.invalidateQueries({ queryKey: ["profile", "me"] });
+
+      setIsEditing(false);
+    } catch (err: any) {
+      setError(err.message ?? "Gagal menyimpan profil.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ======================================================================
+  // RENDER
+  // ======================================================================
   return (
     <div className="flex flex-col gap-3">
-      {/* ===== PAGE TITLE ===== */}
-      <h2 className="text-lg sm:text-xl font-semibold">Profile</h2>
-
-      {/* ===== MAIN CARD ===== */}
-      <Card className="p-6">
-        <div className="flex flex-col md:flex-row md:items-start gap-6">
-          {/* Avatar */}
-          <Avatar className="h-17.5 w-17.5 shrink-0">
-            <AvatarImage src={main.avatarUrl} alt={main.avatarAlt} />
-            <AvatarFallback>{initials(main.namaLengkap)}</AvatarFallback>
-          </Avatar>
-
-          {/* Right content */}
-          <div className="flex flex-col w-full">
-            {/* Nama + Jabatan */}
-            <div>
-              <h1
-                className={`text-xl font-semibold leading-tight ${
-                  main.namaLengkap.split(" ").length > 2
-                    ? "whitespace-normal wrap-break-word max-w-[260px] sm:max-w-[320px]"
-                    : "whitespace-nowrap"
-                }`}
-              >
-                {main.namaLengkap}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {main.jabatanTerakhir}
-              </p>
-            </div>
-
-            {/* PN / Phone kiri + Email kanan */}
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-y-2 lg:gap-x-8 relative">
-              {/* Kolom kiri */}
-              <div className="space-y-2">
-                <KVStack label="NIK" value={main.nikPn} nowrap />
-                <KVStack label="Handphone" value={main.handphone} nowrap />
-              </div>
-
-              {/* Garis vertikal dihapus di sini */}
-
-              {/* Kolom kanan */}
-              <div className="pt-2 lg:pt-0 lg:pl-10">
-                <KVStack
-                  label="Email"
-                  value={main.email}
-                  classNameValue="break-all sm:break-normal sm:truncate sm:max-w-[360px]"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* ===== CONTENT CARDS ===== */}
-      <div className="grid grid-cols-1 gap-6 mt-6">
-        <SectionCard title="Personal Information">
-          <TwoColList items={personal} />
-        </SectionCard>
-
-        <SectionCard title="Work Performance">
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">
-                Penilaian Kerja
-              </p>
-              {performance.penilaianKerja.map((text, i) => (
-                <p key={i} className="font-semibold leading-relaxed">
-                  {text}
-                </p>
-              ))}
-            </div>
-
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Achievement</p>
-              {performance.achievements.map((a, i) => (
-                <p key={i} className="font-semibold leading-relaxed">
-                  {a}
-                </p>
-              ))}
-            </div>
-          </div>
-        </SectionCard>
+      {/* HEADER TITLE */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg sm:text-xl font-semibold">Profile</h2>
       </div>
+
+      {loading && (
+        <p className="text-xs sm:text-sm text-muted-foreground">
+          Memuat data profil...
+        </p>
+      )}
+      {error && (
+        <p className="text-xs sm:text-sm text-red-600">{error}</p>
+      )}
+
+      {/* HEADER CARD */}
+      <ProfileHeaderCard
+        main={main}
+        onEdit={() => setIsEditing(true)}
+      />
+
+      {/* PERSONAL INFO */}
+      <ProfilePersonalCard items={personal} />
+
+      {/* WORK PERFORMANCE */}
+      <ProfilePerformanceCard performance={performance} />
+
+      {/* POPUP EDIT FORM */}
+      <ProfileEditDialog
+        open={isEditing}
+        onOpenChange={setIsEditing}
+        main={main}
+        form={form}
+        setForm={setForm}
+        saving={saving}
+        onSubmit={handleSave}
+      />
     </div>
   );
-}
-
-/* ===== Small Components ===== */
-function KVStack({
-  label,
-  value,
-  nowrap,
-  classNameValue,
-}: {
-  label: string;
-  value: string;
-  nowrap?: boolean;
-  classNameValue?: string;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p
-        className={[
-          "text-sm font-semibold min-w-0 overflow-hidden",
-          nowrap ? "whitespace-nowrap" : "wrap-break-word",
-          classNameValue ?? "",
-        ].join(" ")}
-        title={value}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-/* ===== Two-Column List ===== */
-function TwoColList({ items }: { items: KeyVal[] }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-y-2 md:gap-y-3 gap-x-8">
-      {items.map((it) => (
-        <div key={it.label} className="flex flex-col min-w-0">
-          <span className="text-sm text-muted-foreground">{it.label}</span>
-          <span className="font-semibold wrap-break-word whitespace-pre-wrap">
-            {it.value}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ===== Section Card ===== */
-function SectionCard({
-  title,
-  children,
-  className,
-}: React.PropsWithChildren<{ title: string; className?: string }>) {
-  return (
-    <Card className={className}>
-      <div className="p-3 md:p-4">
-        <h2 className="text-lg font-semibold tracking-tight mb-2">{title}</h2>
-        <div className="border-t border-gray-200" />
-        <CardContent className="p-0 pt-3">{children}</CardContent>
-      </div>
-    </Card>
-  );
-}
-
-/* ===== Helper ===== */
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 }

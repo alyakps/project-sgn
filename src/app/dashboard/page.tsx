@@ -4,7 +4,6 @@ import * as React from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 
-import ProfileCard from "@/components/dashboard/ProfileCard";
 import ProgressSummaryCard from "@/components/dashboard/ProgressSummaryCard";
 
 import { Label } from "@/components/ui/label";
@@ -31,12 +30,15 @@ function DashboardPage() {
   const router = useRouter();
 
   const [loadingAuth, setLoadingAuth] = React.useState(true);
-  const [loadingSummary, setLoadingSummary] = React.useState(true);
+  const [loadingSummary, setLoadingSummary] = React.useState(false);
   const [errorSummary, setErrorSummary] = React.useState<string | null>(null);
 
-  // ==== FILTER TAHUN ====
-  const [yearOptions, setYearOptions] = React.useState<number[]>([]);
-  const [selectedYear, setSelectedYear] = React.useState<"all" | number>("all");
+  // 🔹 Tahun Hard & Soft dipisah (list tahun juga dipisah)
+  const [yearOptionsHard, setYearOptionsHard] = React.useState<number[]>([]);
+  const [yearOptionsSoft, setYearOptionsSoft] = React.useState<number[]>([]);
+
+  const [yearHard, setYearHard] = React.useState<"all" | number>("all");
+  const [yearSoft, setYearSoft] = React.useState<"all" | number>("all");
 
   // ==== DATA USER ====
   const [userName, setUserName] = React.useState<string>("Karyawan");
@@ -81,7 +83,6 @@ function DashboardPage() {
     setEmpTitle(user.jabatan_terakhir || user.role || "Karyawan");
     setEmpUnit(user.unit || "Unit / Divisi");
 
-    // kalau di local storage sudah ada foto, pakai dulu
     if (user.photo_url) {
       setAvatarUrl(user.photo_url);
     } else if (user.profile?.photo_url) {
@@ -93,35 +94,61 @@ function DashboardPage() {
     setLoadingAuth(false);
   }, [router]);
 
-  // ========= AMBIL SUMMARY (bisa dipanggil ulang waktu ganti tahun) =========
-  const loadSummary = React.useCallback(
+  // 🔧 Helper: normalisasi list tahun dari field apa pun
+  function normalizeYears(raw: any): number[] {
+    const arr = Array.isArray(raw) ? raw : [];
+    const nums = arr
+      .map((v) => Number(v))
+      .filter((v) => !Number.isNaN(v));
+
+    // urut desc biar tahun terbaru di atas
+    nums.sort((a, b) => b - a);
+    return nums;
+  }
+
+  // 🔧 Helper: panggil summary untuk tahun tertentu
+  const fetchSummary = React.useCallback(
     async (tahun: "all" | number) => {
       const token = getToken();
-      if (!token) return;
+      if (!token) return null;
+      const data = await apiKaryawanSummary(token, tahun);
+      return data;
+    },
+    []
+  );
 
-      setLoadingSummary(true);
-      setErrorSummary(null);
+  /**
+   * 🔹 Load awal dashboard:
+   * - pakai tahun "all" → isi awal summary + list tahun
+   */
+  React.useEffect(() => {
+    if (loadingAuth) return;
 
+    (async () => {
       try {
-        const data: any = await apiKaryawanSummary(token, tahun);
+        setLoadingSummary(true);
+        setErrorSummary(null);
+
+        const data: any = await fetchSummary("all");
+        if (!data) return;
 
         const profile = data.profile ?? {};
-
         if (profile.name) setUserName(profile.name);
         if (profile.nik) setEmpNo(profile.nik);
         if (profile.jabatan) setEmpTitle(profile.jabatan);
         if (profile.unit_kerja) setEmpUnit(profile.unit_kerja);
+        setAvatarUrl(profile.photo_url || null);
 
-        if (profile.photo_url) {
-          setAvatarUrl(profile.photo_url);
-        } else {
-          setAvatarUrl(null);
-        }
-
-        const yearsFromApi: number[] = (data.available_years ?? []).map(
-          (y: any) => Number(y)
+        // 🔹 Tahun per tipe (kalau backend sudah kirim per-type, kita pakai itu)
+        const yearsHard = normalizeYears(
+          data.available_years_hard ?? data.available_years ?? []
         );
-        setYearOptions(yearsFromApi);
+        const yearsSoft = normalizeYears(
+          data.available_years_soft ?? data.available_years ?? []
+        );
+
+        setYearOptionsHard(yearsHard);
+        setYearOptionsSoft(yearsSoft);
 
         const hard = data.hard_competency ?? {};
         const hardStatus = hard.status_counts ?? {};
@@ -140,26 +167,24 @@ function DashboardPage() {
           tidakTercapai: Number(softStatus.tidak_tercapai ?? 0),
           avg: Number(soft.avg_nilai ?? 0),
         });
+
+        setYearHard("all");
+        setYearSoft("all");
       } catch (err: any) {
         console.error(err);
         setErrorSummary(err.message || "Gagal mengambil summary");
       } finally {
         setLoadingSummary(false);
       }
-    },
-    []
-  );
-
-  // pertama kali: all year
-  React.useEffect(() => {
-    if (!loadingAuth) {
-      loadSummary("all");
-    }
-  }, [loadingAuth, loadSummary]);
+    })();
+  }, [loadingAuth, fetchSummary]);
 
   const firstName = getFirstName(userName);
-  const selectValue =
-    selectedYear === "all" ? "all" : String(selectedYear ?? "all");
+
+  const selectValueHard =
+    yearHard === "all" ? "all" : String(yearHard ?? "all");
+  const selectValueSoft =
+    yearSoft === "all" ? "all" : String(yearSoft ?? "all");
 
   if (loadingAuth) {
     return (
@@ -178,15 +203,6 @@ function DashboardPage() {
           </h1>
         </header>
 
-        {/* 🔹 Di sini pakai avatarUrl dari state, BUKAN "/avatar.png" */}
-        <ProfileCard
-          name={userName}
-          avatarUrl={avatarUrl}
-          empNo={empNo}
-          title={empTitle}
-          unit={empUnit}
-        />
-
         {errorSummary && (
           <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
             {errorSummary}
@@ -194,6 +210,7 @@ function DashboardPage() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* 🔵 HARD SUMMARY CARD */}
           <ProgressSummaryCard
             title="Progress – Hard Competency"
             totalItems={hardSummary.total}
@@ -204,28 +221,62 @@ function DashboardPage() {
             filterSlot={
               <div className="flex items-center gap-2">
                 <Label
-                  htmlFor="year-filter"
+                  htmlFor="year-filter-hard"
                   className="text-xs text-muted-foreground"
                 >
                   Year
                 </Label>
                 <Select
-                  value={selectValue}
+                  value={selectValueHard}
                   onValueChange={async (v) => {
                     const tahun = v === "all" ? "all" : Number(v);
-                    setSelectedYear(tahun);
-                    await loadSummary(tahun);
+                    setYearHard(tahun);
+
+                    try {
+                      setLoadingSummary(true);
+                      setErrorSummary(null);
+
+                      const data: any = await fetchSummary(tahun);
+                      if (!data) return;
+
+                      const yearsHard = normalizeYears(
+                        data.available_years_hard ??
+                          data.available_years ??
+                          []
+                      );
+                      setYearOptionsHard(yearsHard);
+
+                      const hard = data.hard_competency ?? {};
+                      const hardStatus = hard.status_counts ?? {};
+                      setHardSummary({
+                        total: Number(hard.total ?? 0),
+                        tercapai: Number(hardStatus.tercapai ?? 0),
+                        tidakTercapai: Number(
+                          hardStatus.tidak_tercapai ?? 0
+                        ),
+                        avg: Number(hard.avg_nilai ?? 0),
+                      });
+
+                      // 🔸 Soft tidak diutak-atik di sini
+                    } catch (err: any) {
+                      console.error(err);
+                      setErrorSummary(
+                        err.message || "Gagal mengambil summary hard"
+                      );
+                    } finally {
+                      setLoadingSummary(false);
+                    }
                   }}
-                  disabled={loadingSummary || yearOptions.length === 0}
+                  disabled={loadingSummary || yearOptionsHard.length === 0}
                 >
-                  <SelectTrigger id="year-filter" className="h-8 w-28">
+                  <SelectTrigger id="year-filter-hard" className="h-8 w-28">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent align="end">
-                    {yearOptions.length > 1 && (
-                      <SelectItem value="all">All</SelectItem>
-                    )}
-                    {yearOptions.map((y) => (
+                    {/* ✅ "All" selalu ada */}
+                    <SelectItem value="all">All</SelectItem>
+
+                    {yearOptionsHard.map((y) => (
                       <SelectItem key={y} value={String(y)}>
                         {y}
                       </SelectItem>
@@ -236,6 +287,7 @@ function DashboardPage() {
             }
           />
 
+          {/* 🟣 SOFT SUMMARY CARD */}
           <ProgressSummaryCard
             title="Progress – Soft Competency"
             totalItems={softSummary.total}
@@ -252,22 +304,56 @@ function DashboardPage() {
                   Year
                 </Label>
                 <Select
-                  value={selectValue}
+                  value={selectValueSoft}
                   onValueChange={async (v) => {
                     const tahun = v === "all" ? "all" : Number(v);
-                    setSelectedYear(tahun);
-                    await loadSummary(tahun);
+                    setYearSoft(tahun);
+
+                    try {
+                      setLoadingSummary(true);
+                      setErrorSummary(null);
+
+                      const data: any = await fetchSummary(tahun);
+                      if (!data) return;
+
+                      const yearsSoft = normalizeYears(
+                        data.available_years_soft ??
+                          data.available_years ??
+                          []
+                      );
+                      setYearOptionsSoft(yearsSoft);
+
+                      const soft = data.soft_competency ?? {};
+                      const softStatus = soft.status_counts ?? {};
+                      setSoftSummary({
+                        total: Number(soft.total ?? 0),
+                        tercapai: Number(softStatus.tercapai ?? 0),
+                        tidakTercapai: Number(
+                          softStatus.tidak_tercapai ?? 0
+                        ),
+                        avg: Number(soft.avg_nilai ?? 0),
+                      });
+
+                      // 🔸 Hard tidak diubah di sini
+                    } catch (err: any) {
+                      console.error(err);
+                      setErrorSummary(
+                        err.message || "Gagal mengambil summary soft"
+                      );
+                    } finally {
+                      setLoadingSummary(false);
+                    }
                   }}
-                  disabled={loadingSummary || yearOptions.length === 0}
+                  disabled={loadingSummary || yearOptionsSoft.length === 0}
                 >
                   <SelectTrigger id="year-filter-soft" className="h-8 w-28">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent align="end">
-                    {yearOptions.length > 1 && (
-                      <SelectItem value="all">All</SelectItem>
-                    )}
-                    {yearOptions.map((y) => (
+                    {/* ✅ "All" selalu ada */}
+                    <SelectItem value="all">All</SelectItem>
+
+                    {yearOptionsSoft.map((y) => (
                       <SelectItem key={y} value={String(y)}>
                         {y}
                       </SelectItem>

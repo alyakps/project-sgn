@@ -35,6 +35,9 @@ import { getUser, clearAuth, getToken } from "@/lib/auth-storage";
 import { getFirstName } from "@/lib/competency";
 import { apiLogout } from "@/lib/api";
 
+/* React Query */
+import { useQuery } from "@tanstack/react-query";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function DashboardLayout({
@@ -165,76 +168,77 @@ function SidebarItem({
 
 /* ===== TOP BAR (Persona Talent + avatar kanan, pakai data user + summary API) ===== */
 
+// helper fetcher untuk React Query
+async function fetchProfileSummary(token: string) {
+  if (!API_URL) {
+    throw new Error("API_URL is not defined");
+  }
+
+  const res = await fetch(`${API_URL}/api/dashboard/karyawan/summary`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const json = await res.json().catch(() => ({} as any));
+
+  if (!res.ok) {
+    throw new Error(json?.message || "Gagal memuat summary profil");
+  }
+
+  return json as any; // shape: { data: { profile: {...}, ... } } atau { profile: {...} }
+}
+
 function TopBar() {
   const router = useRouter();
 
-  const [name, setName] = React.useState<string>("User");
-  const [subtitle, setSubtitle] = React.useState<string>("Karyawan");
-  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
+  // dasar dari localStorage (hasil login)
+  const baseUser = getUser();
+  const token = getToken();
 
-  React.useEffect(() => {
-    // 1) Ambil data dasar dari localStorage (hasil login / auth:me)
-    const user = getUser();
-    if (user) {
-      const fullName = user.name || "User";
-      setName(fullName);
+  const { data } = useQuery({
+    // ⬇️ masukkan token ke queryKey biar kalau login/logout, re-fetch
+    queryKey: ["profile", "me", token],
+    queryFn: () => fetchProfileSummary(token as string),
+    enabled: !!token && !!API_URL,
+    // Biar gampang refresh data setelah invalidation
+    staleTime: 0,
+  });
 
-      const jabatan =
-        user.jabatan_terakhir ||
-        user.role ||
-        user.unit_kerja ||
-        user.unit ||
-        "Karyawan";
-      setSubtitle(jabatan);
+  const raw = (data as any) ?? {};
+  const profile = raw.data?.profile ?? raw.profile ?? {};
 
-      if (user.photo_url) {
-        setAvatarUrl(user.photo_url);
-      } else if (user.profile?.photo_url) {
-        setAvatarUrl(user.profile.photo_url);
-      }
-    }
+  const name =
+    profile.nama_lengkap ??
+    profile.name ??
+    baseUser?.name ??
+    "User";
 
-    // 2) Sinkron dengan data summary (supaya sama kaya ProfileCard)
-    const token = getToken();
-    if (!token || !API_URL) return;
+  const subtitle =
+    profile.jabatan_terakhir ??
+    profile.jabatan ??
+    profile.unit_kerja ??
+    baseUser?.jabatan_terakhir ??
+    baseUser?.role ??
+    baseUser?.unit_kerja ??
+    baseUser?.unit ??
+    "Karyawan";
 
-    (async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/dashboard/karyawan/summary`, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const json = await res.json().catch(() => ({} as any));
-        if (!res.ok) return;
-
-        const data = (json as any).data ?? json;
-        const profile = data.profile ?? {};
-
-        if (profile.name) setName(profile.name);
-
-        if (profile.jabatan || profile.unit_kerja) {
-          setSubtitle(profile.jabatan || profile.unit_kerja || "Karyawan");
-        }
-
-        if (profile.photo_url) {
-          setAvatarUrl(profile.photo_url);
-        }
-      } catch (err) {
-        console.error("Failed to sync topbar profile:", err);
-      }
-    })();
-  }, []);
+  const avatarUrlRaw =
+    profile.photo_url ??
+    baseUser?.photo_url ??
+    baseUser?.profile?.photo_url ??
+    null;
 
   const firstName = getFirstName(name);
   const firstInitial = firstName.charAt(0).toUpperCase() || "U";
 
-  // hanya pakai AvatarImage kalau string-nya beneran ada
   const safeAvatarUrl =
-    avatarUrl && avatarUrl.trim() !== "" ? avatarUrl : undefined;
+    avatarUrlRaw && typeof avatarUrlRaw === "string" && avatarUrlRaw.trim() !== ""
+      ? avatarUrlRaw
+      : undefined;
 
   const handleGoProfile = () => router.push("/dashboard/profile");
   const handleChangePassword = () => router.push("/dashboard/password");
@@ -247,7 +251,6 @@ function TopBar() {
       }
     } catch (err) {
       console.error("Logout error:", err);
-      // tetap lanjut clear auth di finally
     } finally {
       clearAuth();
       router.push("/login");
