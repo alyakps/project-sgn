@@ -32,11 +32,14 @@ export default function SignInPage() {
     setLoading(true);
 
     try {
+      // 1) Login → dapat token
       const loginRes = await apiLogin(email, password);
       const token = loginRes.token;
 
+      // 2) Ambil data user
       const me = await apiMe(token);
 
+      // 3) Simpan auth ke localStorage
       saveAuth(token, {
         id: me.id,
         nik: me.nik ?? null,
@@ -45,13 +48,18 @@ export default function SignInPage() {
         role: me.role,
       });
 
-      if (me.role === "admin") {
-        router.push("/admin/dashboard");
+      // 4) Normalisasi role, jaga2 kalau dari API "Admin"/"ADMIN"
+      const role = String(me.role).toLowerCase();
+
+      if (role === "admin") {
+        // Admin → ke dashboard admin (route kamu sekarang)
+        router.replace("/admin");
       } else {
-        router.push("/dashboard");
+        // Karyawan → ke dashboard karyawan
+        router.replace("/dashboard"); // ganti "/" → "/dashboard" biar konsisten
       }
     } catch (err: any) {
-      setError(err.message || "Email atau password salah");
+      setError(err?.message || "Email atau password salah");
     } finally {
       setLoading(false);
     }
@@ -134,7 +142,7 @@ export default function SignInPage() {
             <Button
               type="submit"
               disabled={loading}
-              className={[ 
+              className={[
                 "w-full h-10 rounded-md font-semibold text-white",
                 "bg-[#05398f] hover:bg-[#042E71]",
                 "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#05398f]",

@@ -42,17 +42,92 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 type Role = "karyawan" | "admin";
 
-function DashboardShell({
-  children,
-  role: _role, // disiapkan untuk nanti (shared), sekarang belum dipakai
-}: {
+type DashboardShellProps = {
   children: React.ReactNode;
   role: Role;
-}) {
+};
+
+export function DashboardShell({ children, role }: DashboardShellProps) {
   const pathname = usePathname();
 
   const isActive = (base: string) =>
     pathname === base || pathname.startsWith(base + "/");
+
+  // === CONFIG SIDEBAR BERDASARKAN ROLE ===
+  const overviewItems =
+    role === "karyawan"
+      ? [
+          {
+            href: "/dashboard",
+            label: "Dashboard",
+            checkActive: () =>
+              isActive("/dashboard") && pathname === "/dashboard",
+            icon: <LayoutDashboard className="h-5 w-5" />,
+          },
+          {
+            href: "/dashboard/hard",
+            label: "Hard Competency",
+            checkActive: () => isActive("/dashboard/hard"),
+            icon: <BarChart className="h-5 w-5" />,
+          },
+          {
+            href: "/dashboard/soft",
+            label: "Soft Competency",
+            checkActive: () => isActive("/dashboard/soft"),
+            icon: <LineChart className="h-5 w-5" />,
+          },
+        ]
+      : [
+          // ⬇️⬇️ DI SINI YANG DIGANTI: /admin  ->  /admin/dashboard
+          {
+            href: "/admin",
+            label: "Dashboard",
+            checkActive: () =>
+              isActive("/admin") &&
+              pathname === "/admin",
+            icon: <LayoutDashboard className="h-5 w-5" />,
+          },
+          {
+            href: "/admin/data-entry",
+            label: "Data Entry",
+            checkActive: () => isActive("/admin/data-entry"),
+            icon: <BarChart className="h-5 w-5" />,
+          },
+          {
+            href: "/admin/hard",
+            label: "Hard Competency",
+            checkActive: () => isActive("/admin/hard"),
+            icon: <BarChart className="h-5 w-5" />,
+          },
+          {
+            href: "/admin/soft",
+            label: "Soft Competency",
+            checkActive: () => isActive("/admin/soft"),
+            icon: <LineChart className="h-5 w-5" />,
+          },
+          {
+            href: "/admin/users",
+            label: "User Management",
+            checkActive: () => isActive("/admin/users"),
+            icon: <User className="h-5 w-5" />,
+          },
+        ];
+
+  // settings sama kayak punyamu, biar nggak berubah behaviour-nya
+  const settingsItems = [
+    {
+      href: "/dashboard/profile",
+      label: "Profile",
+      checkActive: () => isActive("/dashboard/profile"),
+      icon: <User className="h-5 w-5" />,
+    },
+    {
+      href: "/",
+      label: "Logout",
+      checkActive: () => false,
+      icon: <LogOut className="h-5 w-5" />,
+    },
+  ];
 
   return (
     <div className="h-screen w-full bg-zinc-50 flex flex-col overflow-hidden">
@@ -74,29 +149,19 @@ function DashboardShell({
           >
             {/* Items */}
             <div className="flex-1 flex flex-col gap-2 md:gap-2.5 overflow-hidden">
-              <SidebarItem
-                href="/dashboard"
-                label="Dashboard"
-                active={isActive("/dashboard") && pathname === "/dashboard"}
-                icon={<LayoutDashboard className="h-5 w-5" />}
-              />
+              {overviewItems.map((item) => (
+                <SidebarItem
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  active={item.checkActive()}
+                  icon={item.icon}
+                />
+              ))}
 
               <div className="hidden md:block text-[17px] font-semibold uppercase tracking-wide text-zinc-900 mt-1">
                 Overview
               </div>
-
-              <SidebarItem
-                href="/dashboard/hard"
-                label="Hard Competency"
-                active={isActive("/dashboard/hard")}
-                icon={<BarChart className="h-5 w-5" />}
-              />
-              <SidebarItem
-                href="/dashboard/soft"
-                label="Soft Competency"
-                active={isActive("/dashboard/soft")}
-                icon={<LineChart className="h-5 w-5" />}
-              />
             </div>
 
             {/* Footer */}
@@ -105,20 +170,15 @@ function DashboardShell({
                 Settings
               </div>
 
-              <SidebarItem
-                href="/dashboard/profile"
-                label="Profile"
-                active={isActive("/dashboard/profile")}
-                icon={<User className="h-5 w-5" />}
-              />
-
-              {/* ini cuma link ke "/" biasa, logout yang bener lewat top bar */}
-              <SidebarItem
-                href="/"
-                label="Logout"
-                active={false}
-                icon={<LogOut className="h-5 w-5" />}
-              />
+              {settingsItems.map((item) => (
+                <SidebarItem
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  active={item.checkActive()}
+                  icon={item.icon}
+                />
+              ))}
             </div>
           </aside>
 
@@ -130,15 +190,6 @@ function DashboardShell({
       </TooltipProvider>
     </div>
   );
-}
-
-/** Layout default untuk /dashboard (karyawan) */
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return <DashboardShell role="karyawan">{children}</DashboardShell>;
 }
 
 /** Sidebar Item (custom div, bukan Button shadcn) */
@@ -212,11 +263,9 @@ function TopBar() {
   const token = getToken();
 
   const { data } = useQuery({
-    // ⬇️ masukkan token ke queryKey biar kalau login/logout, re-fetch
     queryKey: ["profile", "me", token],
     queryFn: () => fetchProfileSummary(token as string),
     enabled: !!token && !!API_URL,
-    // Biar gampang refresh data setelah invalidation
     staleTime: 0,
   });
 
