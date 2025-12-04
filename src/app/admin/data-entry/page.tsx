@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { useState, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,7 +12,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { UploadCloud, FileSpreadsheet } from "lucide-react";
+import { UploadCloud, FileSpreadsheet, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -19,71 +21,77 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type ImportType = "hard" | "soft";
-
-type ImportLog = {
-  id: number;
-  filename: string;
-  type: ImportType;
-  uploadedAt: string;
-  year?: number;
-};
+import {
+  fetchImportLogs,
+  importCompetencyFile,
+  type ImportLog,
+  type ImportType,
+} from "@/lib/api-import";
 
 export default function DataEntryPage() {
   const [file, setFile] = useState<File | null>(null);
   const [type, setType] = useState<ImportType>("hard");
-  const [logs, setLogs] = useState<ImportLog[]>([
-    {
-      id: 1,
-      filename: "hard_competency_2024.xlsx",
-      type: "hard",
-      uploadedAt: "2025-12-03 10:15",
-      year: 2024,
-    },
-    {
-      id: 2,
-      filename: "soft_competency_2024.xlsx",
-      type: "soft",
-      uploadedAt: "2025-12-03 10:30",
-      year: 2024,
-    },
-  ]);
-
-  // Tahun 2000–2100
-  const yearOptions = Array.from({ length: 101 }, (_, i) => 2000 + i);
   const [year, setYear] = useState<number>(2024);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const queryClient = useQueryClient();
+
+  // Tahun 2000–2100
+  const yearOptions = React.useMemo(
+    () => Array.from({ length: 101 }, (_, i) => 2000 + i),
+    []
+  );
+
+  /* ==================== FETCH LOG IMPORT ==================== */
+
+  const {
+    data: logsData,
+    isLoading: isLogsLoading,
+    isError: isLogsError,
+    error: logsError,
+  } = useQuery<ImportLog[]>({
+    queryKey: ["import-logs"],
+    queryFn: fetchImportLogs,
+  });
+
+  const logs = logsData ?? [];
+
+  /* ==================== MUTATION IMPORT FILE ==================== */
+
+  const importMutation = useMutation({
+    mutationFn: async () => {
+      if (!file) throw new Error("File belum dipilih");
+      return importCompetencyFile(type, file, year);
+    },
+    onSuccess: () => {
+      setStatusMessage("Import berhasil disimpan.");
+      queryClient.invalidateQueries({ queryKey: ["import-logs"] });
+
+      setFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    },
+    onError: (err: unknown) => {
+      if (err instanceof Error) {
+        setStatusMessage(err.message);
+      } else {
+        setStatusMessage("Gagal mengimport file.");
+      }
+    },
+  });
+
+  /* ==================== HANDLERS ==================== */
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return;
-
-    const now = new Date();
-    const uploadedAt = `${now.getFullYear()}-${String(
-      now.getMonth() + 1
-    ).padStart(2, "0")}-${String(now.getDate()).padStart(
-      2,
-      "0"
-    )} ${String(now.getHours()).padStart(2, "0")}:${String(
-      now.getMinutes()
-    ).padStart(2, "0")}`;
-
-    setLogs((prev) => [
-      {
-        id: prev.length ? prev[prev.length - 1].id + 1 : 1,
-        filename: file.name,
-        type,
-        uploadedAt,
-        year,
-      },
-      ...prev,
-    ]);
-
-    setFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+    setStatusMessage(null);
+    if (!file) {
+      setStatusMessage("Silakan pilih file terlebih dahulu.");
+      return;
     }
+    importMutation.mutate();
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -91,6 +99,7 @@ export default function DataEntryPage() {
     const droppedFile = e.dataTransfer.files?.[0];
     if (droppedFile) {
       setFile(droppedFile);
+      setStatusMessage(null);
     }
   };
 
@@ -102,6 +111,8 @@ export default function DataEntryPage() {
     fileInputRef.current?.click();
   };
 
+  /* ==================== RENDER ==================== */
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -111,7 +122,7 @@ export default function DataEntryPage() {
         </h1>
       </div>
 
-      {/* Form Import */}
+      {/* Form Import (tetap pakai Card) */}
       <Card className="border-zinc-200">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -119,8 +130,8 @@ export default function DataEntryPage() {
             Import File Excel
           </CardTitle>
           <CardDescription className="text-xs sm:text-sm">
-            Pilih jenis kompetensi dan unggah file Excel (.xls / .xlsx) sesuai
-            template yang sudah ditentukan.
+            Pilih jenis kompetensi dan unggah file Excel (.xls / .xlsx)
+            sesuai template yang sudah ditentukan.
           </CardDescription>
         </CardHeader>
 
@@ -135,11 +146,11 @@ export default function DataEntryPage() {
                 Jenis Kompetensi
               </label>
 
-              {/* ⬇️ suppressHydrationWarning utk cegah warning Select Radix */}
               <div suppressHydrationWarning>
                 <Select
                   value={type}
                   onValueChange={(val: ImportType) => setType(val)}
+                  disabled={importMutation.isPending}
                 >
                   <SelectTrigger className="w-full sm:w-72">
                     <SelectValue placeholder="Pilih jenis kompetensi" />
@@ -158,11 +169,11 @@ export default function DataEntryPage() {
                 Tahun
               </label>
 
-              {/* ⬇️ suppressHydrationWarning lagi di Select tahun */}
               <div suppressHydrationWarning>
                 <Select
                   value={String(year)}
                   onValueChange={(val) => setYear(Number(val))}
+                  disabled={importMutation.isPending}
                 >
                   <SelectTrigger className="w-full sm:w-72">
                     <SelectValue placeholder="Pilih tahun" />
@@ -194,6 +205,7 @@ export default function DataEntryPage() {
                   type="button"
                   onClick={openFileDialog}
                   className="inline-flex items-center gap-2 bg-[#05398f] hover:bg-[#032b6a]"
+                  disabled={importMutation.isPending}
                 >
                   <UploadCloud className="h-4 w-4" />
                   <span className="text-sm font-medium">Import</span>
@@ -218,76 +230,106 @@ export default function DataEntryPage() {
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) setFile(f);
+                  if (f) {
+                    setFile(f);
+                    setStatusMessage(null);
+                  }
                 }}
               />
 
               <p className="text-xs text-zinc-500">
-                Maksimal 10MB. Pastikan format kolom sudah sesuai template
-                sistem.
+                Maksimal 10MB. Pastikan format kolom sudah sesuai.
               </p>
+
+              {statusMessage && (
+                <p className="text-xs text-red-600">{statusMessage}</p>
+              )}
             </div>
 
             {/* Submit */}
             <div className="pt-1">
               <Button
                 type="submit"
-                disabled={!file}
+                disabled={!file || importMutation.isPending}
                 className="inline-flex items-center gap-2 bg-[#05398f] hover:bg-[#032b6a]"
               >
-                <FileSpreadsheet className="h-4 w-4" />
-                <span className="text-sm">Save</span>
+                {importMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="h-4 w-4" />
+                    <span className="text-sm">Save</span>
+                  </>
+                )}
               </Button>
             </div>
           </form>
         </CardContent>
       </Card>
 
-      {/* Log Import */}
-      <Card className="border-zinc-200">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+      {/* Log Import - TANPA CARD, tabel full width */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-[#05398f]" />
-            Log Import
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {logs.length === 0 ? (
-            <p className="text-sm text-zinc-500">
-              Belum ada data import yang tercatat.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full border border-zinc-200 text-xs sm:text-sm">
+            <h2 className="text-base sm:text-lg font-semibold text-zinc-900">
+              Log Import
+            </h2>
+          </div>
+        </div>
+
+        {/* Wrapper tabel ujung ke ujung */}
+        <div className="overflow-x-auto">
+          <div className="min-w-full border border-zinc-200 rounded-md overflow-hidden">
+            {isLogsLoading ? (
+              <p className="px-4 py-3 text-sm text-zinc-500">
+                Memuat log import...
+              </p>
+            ) : isLogsError ? (
+              <p className="px-4 py-3 text-sm text-red-600">
+                {(logsError as Error)?.message ??
+                  "Gagal memuat log import dari server."}
+              </p>
+            ) : logs.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-zinc-500">
+                Belum ada data import yang tercatat.
+              </p>
+            ) : (
+              <table className="min-w-full border-collapse">
                 <thead className="bg-zinc-50">
                   <tr>
-                    <th className="border-b border-zinc-200 px-3 py-2 text-left font-medium text-zinc-700">
+                    <th className="px-4 py-2.5 text-left text-xs sm:text-sm font-medium text-zinc-700 border-b border-zinc-200">
                       Nama File
                     </th>
-                    <th className="border-b border-zinc-200 px-3 py-2 text-left font-medium text-zinc-700">
+                    <th className="px-4 py-2.5 text-left text-xs sm:text-sm font-medium text-zinc-700 border-b border-zinc-200">
                       Jenis Kompetensi
                     </th>
-                    <th className="border-b border-zinc-200 px-3 py-2 text-left font-medium text-zinc-700">
+                    <th className="px-4 py-2.5 text-left text-xs sm:text-sm font-medium text-zinc-700 border-b border-zinc-200">
                       Tahun
                     </th>
-                    <th className="border-b border-zinc-200 px-3 py-2 text-left font-medium text-zinc-700">
+                    <th className="px-4 py-2.5 text-left text-xs sm:text-sm font-medium text-zinc-700 border-b border-zinc-200">
                       Uploaded At
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {logs.map((log) => (
+                  {logs.map((log, idx) => (
                     <tr
                       key={log.id}
-                      className="odd:bg-white even:bg-zinc-50/60"
+                      className={
+                        idx % 2 === 0 ? "bg-white" : "bg-zinc-50/70"
+                      }
                     >
-                      <td className="border-b border-zinc-100 px-3 py-2 text-zinc-800">
+                      <td className="px-4 py-2.5 text-xs sm:text-sm text-zinc-800 border-b border-zinc-100">
                         {log.filename}
                       </td>
-                      <td className="border-b border-zinc-100 px-3 py-2">
+                      <td className="px-4 py-2.5 text-xs sm:text-sm border-b border-zinc-100">
                         <span
                           className={[
-                            "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium border",
+                            "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium border",
                             log.type === "hard"
                               ? "bg-blue-50 text-blue-700 border-blue-100"
                               : "bg-emerald-50 text-emerald-700 border-emerald-100",
@@ -298,20 +340,20 @@ export default function DataEntryPage() {
                             : "Soft Competency"}
                         </span>
                       </td>
-                      <td className="border-b border-zinc-100 px-3 py-2 text-zinc-700">
+                      <td className="px-4 py-2.5 text-xs sm:text-sm text-zinc-700 border-b border-zinc-100">
                         {log.year ?? "-"}
                       </td>
-                      <td className="border-b border-zinc-100 px-3 py-2 text-zinc-700">
+                      <td className="px-4 py-2.5 text-xs sm:text-sm text-zinc-700 border-b border-zinc-100">
                         {log.uploadedAt}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

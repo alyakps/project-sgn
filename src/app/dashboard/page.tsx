@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 
 import ProgressSummaryCard from "@/components/dashboard/ProgressSummaryCard";
+import ProfileCard from "@/components/dashboard/ProfileCard"; // ⬅️ TAMBAHAN
 
 import { Label } from "@/components/ui/label";
 import {
@@ -202,6 +203,15 @@ function DashboardPage() {
             Welcome, {firstName}
           </h1>
         </header>
+
+        {/* 🔵 Profile card di bawah heading */}
+        <ProfileCard
+          name={userName}
+          avatarUrl={avatarUrl ?? undefined}
+          empNo={empNo}
+          title={empTitle}
+          unit={empUnit}
+        />
 
         {errorSummary && (
           <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">

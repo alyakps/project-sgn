@@ -8,8 +8,7 @@ export default function AdminDashboardPage() {
       </h1>
 
       <p className="text-sm text-zinc-600">
-        Ini halaman utama untuk admin. Nanti bisa kamu isi dengan card summary,
-        grafik, atau quick action (import data, kelola user, dll).
+        Ini halaman utama untuk admin.
       </p>
 
       {/* Contoh placeholder card biar kelihatan ada konten */}
