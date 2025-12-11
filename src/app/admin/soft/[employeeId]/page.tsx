@@ -1,7 +1,9 @@
-// src/app/dashboard/soft-competency/page.tsx
+// src/app/admin/soft/[employeeId]/page.tsx
 "use client";
 
 import * as React from "react";
+import { useRouter, useParams } from "next/navigation";
+
 import {
   RadarChart,
   Radar,
@@ -22,12 +24,14 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { ArrowLeft } from "lucide-react";
 
-import { getToken } from "@/lib/auth-storage";
+import { getToken, getUser, clearAuth } from "@/lib/auth-storage";
 
-// =======================
-// TYPE DEFINITIONS
-// =======================
+/* =======================
+ *  TYPES
+ * ======================= */
+
 type ChartItem = {
   id_kompetensi: string;
   kode: string;
@@ -48,25 +52,26 @@ type Item = {
   deskripsi: string | null;
 };
 
-type ApiResponse = {
-  data: {
-    nik: string;
-    tahun: number | null;
-    chart: ChartItem[];
-    items: Item[];
-    available_years?: number[];
-  };
+type AdminSoftApiData = {
+  nik: string;
+  tahun: number | null;
+  chart: ChartItem[];
+  items: Item[];
+  available_years?: number[];
 };
 
-const API_BASE_URL =
-  (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000").replace(
-    /\/$/,
-    ""
-  ) + "/api";
+type AdminSoftApiResponse = {
+  data?: AdminSoftApiData;
+};
 
-// =======================
-//   HELPER FUNCTIONS
-// =======================
+/* =======================
+ *  HELPER
+ * ======================= */
+
+const API_BASE_URL =
+  (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000")
+    .replace(/\/$/, "") + "/api";
+
 const band = (v: number) => (v >= 86 ? "High" : v >= 70 ? "Middle" : "Low");
 
 function formatStatus(status: string) {
@@ -76,9 +81,19 @@ function formatStatus(status: string) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-async function fetchSoftCompetency(
+/**
+ * Fetch dari endpoint admin:
+ * GET /api/admin/karyawan/{nik}/soft-competencies?tahun=XXXX
+ */
+async function fetchAdminSoftCompetency(
+  nik: string,
   year?: string
-): Promise<ApiResponse["data"]> {
+): Promise<AdminSoftApiData> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
+  }
+
   const params = new URLSearchParams();
   if (year) {
     params.set("tahun", year);
@@ -86,22 +101,18 @@ async function fetchSoftCompetency(
 
   const queryString = params.toString();
   const url =
-    `${API_BASE_URL}/karyawan/soft-competencies` +
+    `${API_BASE_URL}/admin/karyawan/${nik}/soft-competencies` +
     (queryString ? `?${queryString}` : "");
 
-  const headers: HeadersInit = {
-    Accept: "application/json",
-  };
-
-  const token = getToken();
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
+  console.log("[Soft Admin] Fetch URL:", url);
 
   const res = await fetch(url, {
     method: "GET",
-    headers,
-    cache: "no-store", // dashboard data sebaiknya selalu fresh
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
   });
 
   if (!res.ok) {
@@ -115,21 +126,30 @@ async function fetchSoftCompetency(
 
     try {
       const e = await res.json();
-      if (e?.message) msg += ` - ${e.message}`;
+      if ((e as any)?.message) msg += ` - ${(e as any).message}`;
     } catch {
-      // ignore non-json
+      // ignore
     }
 
     throw new Error(msg);
   }
 
-  const json: ApiResponse = await res.json();
-  return json.data;
+  const json: AdminSoftApiResponse = await res.json();
+  const data = json.data;
+
+  if (!data) {
+    throw new Error("Data soft competency tidak ditemukan.");
+  }
+
+  console.log("[Soft Admin] Data dari API:", data);
+
+  return data;
 }
 
-// =======================
-//   SUB COMPONENTS
-// =======================
+/* =======================
+ *  SUB COMPONENTS
+ * ======================= */
+
 type SoftCompetencyChartProps = {
   chart: ChartItem[];
   loading: boolean;
@@ -405,34 +425,69 @@ function SoftCompetencyTable({
   );
 }
 
-// =======================
-//   PAGE COMPONENT
-// =======================
-export default function SoftCompetencyPage() {
-  // tahun yang dipakai untuk query API
-  const [year, setYear] = React.useState<string>("");
+/* =======================
+ *  PAGE (ADMIN PER KARYAWAN)
+ * ======================= */
 
-  // tahun yang sedang ditampilkan di Select
-  const [selectedYear, setSelectedYear] = React.useState<string>("");
+export default function AdminSoftEmployeePage() {
+  const router = useRouter();
+  const params = useParams<{ employeeId: string }>();
+
+  // Sekarang [employeeId] langsung diisi NIK (dari /admin/soft page)
+  const employeeNik = React.useMemo(() => {
+    const raw = params?.employeeId;
+    const value = Array.isArray(raw) ? raw[0] ?? "" : raw ?? "";
+    console.log("[Soft Admin] employeeNik dari route:", value);
+    return value;
+  }, [params]);
+
+  const [year, setYear] = React.useState<string>(""); // untuk query API
+  const [selectedYear, setSelectedYear] = React.useState<string>(""); // untuk Select
 
   const [availableYears, setAvailableYears] = React.useState<string[]>([]);
   const [chart, setChart] = React.useState<ChartItem[]>([]);
   const [items, setItems] = React.useState<Item[]>([]);
-  const [loading, setLoading] = React.useState(false);
+
+  const [loadingAuth, setLoadingAuth] = React.useState(true);
+  const [loadingData, setLoadingData] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // =======================
-  //   FETCH DATA
-  // =======================
+  /* ========== CEK LOGIN & ROLE ADMIN ========== */
   React.useEffect(() => {
+    const token = getToken();
+    const user = getUser();
+
+    if (!token || !user) {
+      clearAuth();
+      router.push("/login");
+      return;
+    }
+
+    if (user.role && user.role !== "admin") {
+      router.push("/");
+      return;
+    }
+
+    setLoadingAuth(false);
+  }, [router]);
+
+  /* ========== FETCH DATA ========== */
+
+  React.useEffect(() => {
+    if (loadingAuth) return;
+    if (!employeeNik) return;
+
     let cancelled = false;
 
     async function load() {
       try {
-        setLoading(true);
+        setLoadingData(true);
         setError(null);
 
-        const data = await fetchSoftCompetency(year || undefined);
+        const data = await fetchAdminSoftCompetency(
+          employeeNik,
+          year || undefined
+        );
         if (cancelled) return;
 
         const yearsFromApi =
@@ -442,31 +497,28 @@ export default function SoftCompetencyPage() {
 
         setAvailableYears(yearsFromApi);
 
-        // 🔹 LOGIKA AUTO PILIH TAHUN TERBARU
+        // === FIX PENTING ===
+        // Fetch pertama (year === "") hanya dipakai untuk tahu daftar tahun.
+        // Kalau tahun dari API = 0 / null → jangan isi chart/items dulu.
         if (!year) {
-          let latestYear = "";
+          const latestYear =
+            data.tahun && data.tahun !== 0
+              ? String(data.tahun)
+              : yearsFromApi[0] ?? "";
 
-          if (yearsFromApi.length > 0) {
-            const sorted = [...yearsFromApi].sort(
-              (a, b) => Number(b) - Number(a)
-            );
-            latestYear = sorted[0]; // tahun terbesar, misal 2025
-          } else if (data.tahun && data.tahun !== 0) {
-            // kalau backend kirim tahun selain 0
-            latestYear = String(data.tahun);
-          }
+          console.log("[Soft Admin] first load, latestYear:", latestYear);
 
           if (latestYear) {
-            // set state -> akan memicu useEffect lagi, fetch dengan tahun spesifik
-            setYear(latestYear);
+            setYear(latestYear); // akan memicu fetch ulang dengan tahun spesifik
             setSelectedYear(latestYear);
-            // JANGAN set chart/items dulu, biar fetch kedua yang isi
-            return;
           }
+
+          // JANGAN set chart/items di sini, biarkan fetch kedua yang isi
+          return;
         }
 
-        // Kalau sudah ada year, atau tidak ada latestYear sama sekali,
-        // kita isi data dari response saat ini.
+        // Kalau sudah ada year (baik dari user pilih atau auto latest),
+        // baru kita isi chart & items dari response.
         let effectiveYear = year;
 
         if (!effectiveYear) {
@@ -480,14 +532,22 @@ export default function SoftCompetencyPage() {
         setSelectedYear(effectiveYear);
         setChart(data.chart ?? []);
         setItems(data.items ?? []);
+
+        console.log(
+          "[Soft Admin] FINAL chart length:",
+          data.chart?.length ?? 0,
+          "items length:",
+          data.items?.length ?? 0
+        );
       } catch (err: any) {
         if (cancelled) return;
+        console.error("[Soft Admin] Error fetch:", err);
         setError(err.message ?? "Gagal memuat data soft competency.");
         setChart([]);
         setItems([]);
       } finally {
         if (!cancelled) {
-          setLoading(false);
+          setLoadingData(false);
         }
       }
     }
@@ -497,21 +557,42 @@ export default function SoftCompetencyPage() {
     return () => {
       cancelled = true;
     };
-  }, [year]);
+  }, [loadingAuth, employeeNik, year]);
+
+  if (loadingAuth) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center text-sm text-muted-foreground">
+        Memuat...
+      </div>
+    );
+  }
 
   return (
     <section className="flex flex-col gap-3">
-      {/* HEADER */}
+      {/* HEADER: panah back kiri + title, filter tahun kanan */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 pb-0 sm:p-5">
-        <h2 className="text-lg font-semibold sm:text-xl">Soft Competency</h2>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h2 className="text-lg font-semibold sm:text-xl">
+            Soft Competency
+          </h2>
+        </div>
 
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-zinc-700">Tahun:</span>
           <Select
             value={selectedYear || ""}
             onValueChange={(val) => {
-              setYear(val); // trigger fetch untuk tahun tsb
-              setSelectedYear(val); // update tampilan Select langsung
+              setYear(val); // trigger fetch untuk tahun tersebut
+              setSelectedYear(val);
             }}
             disabled={availableYears.length === 0}
           >
@@ -529,19 +610,21 @@ export default function SoftCompetencyPage() {
         </div>
       </div>
 
-      {loading && (
+      {loadingData && (
         <p className="px-3 text-xs text-zinc-500 sm:px-5 sm:text-sm">
           Memuat data soft competency...
         </p>
       )}
       {error && (
-        <p className="px-3 text-xs text-red-600 sm:px-5 sm:text-sm">{error}</p>
+        <p className="px-3 text-xs text-red-600 sm:px-5 sm:text-sm">
+          {error}
+        </p>
       )}
 
       {/* CHART */}
       <SoftCompetencyChart
         chart={chart}
-        loading={loading}
+        loading={loadingData}
         availableYears={availableYears}
       />
 
@@ -551,7 +634,7 @@ export default function SoftCompetencyPage() {
       <SoftCompetencyTable
         key={selectedYear || "no-year"}
         items={items}
-        loading={loading}
+        loading={loadingData}
         hasAnyYear={availableYears.length > 0}
       />
     </section>

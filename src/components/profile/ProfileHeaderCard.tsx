@@ -43,6 +43,7 @@ export function ProfileHeaderCard({ main, onEdit }: Props) {
   const {
     namaLengkap,
     jabatanTerakhir,
+    unitKerja,
     nikPn,
     handphone,
     email,
@@ -56,7 +57,7 @@ export function ProfileHeaderCard({ main, onEdit }: Props) {
     <Card className="p-6">
       <div className="flex items-start justify-between gap-4">
         {/* Kiri: avatar + info */}
-        <div className="flex flex-col md:flex-row md:items-start gap-6">
+        <div className="flex flex-col md:flex-row md:items-start gap-6 w-full">
           <Avatar className="h-17.5 w-17.5 shrink-0">
             <AvatarImage src={avatarUrl} alt={avatarAlt} />
             <AvatarFallback>{ini}</AvatarFallback>
@@ -73,18 +74,19 @@ export function ProfileHeaderCard({ main, onEdit }: Props) {
               >
                 {namaLengkap}
               </h1>
-              <p className="text-sm text-muted-foreground">
-                {jabatanTerakhir}
-              </p>
+              <p className="text-sm text-muted-foreground">{jabatanTerakhir}</p>
             </div>
 
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-y-2 lg:gap-x-8">
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-y-2 md:gap-x-8">
+              {/* KOLONG KIRI: NIK (atas) + Unit Kerja (bawah) */}
               <div className="space-y-2">
                 <KVStack label="NIK" value={nikPn} nowrap />
-                <KVStack label="Handphone" value={handphone} nowrap />
+                <KVStack label="Unit Kerja" value={unitKerja} nowrap />
               </div>
 
-              <div className="pt-2 lg:pt-0 lg:pl-10">
+              {/* KOLONG KANAN: Handphone (atas) + Email (bawah) */}
+              <div className="pt-0 lg:pl-10 space-y-2">
+                <KVStack label="Handphone" value={handphone} nowrap />
                 <KVStack
                   label="Email"
                   value={email}

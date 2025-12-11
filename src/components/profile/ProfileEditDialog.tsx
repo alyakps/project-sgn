@@ -5,7 +5,12 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { CityCombobox } from "@/components/profile/CityCombobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -24,6 +29,7 @@ import {
   pendidikanOptions,
   statusPerkawinanOptions,
   sukuOptions,
+  // unitKerjaOptions, // ❌ sudah tidak dipakai lagi
 } from "./profile-options";
 
 type Props = {
@@ -83,6 +89,16 @@ export function ProfileEditDialog({
                   jabatanTerakhir: e.target.value,
                 }))
               }
+            />
+          </div>
+
+          {/* Unit Kerja (READ-ONLY, hanya admin yang boleh ubah di backend) */}
+          <div className="flex flex-col gap-1">
+            <Label className="text-sm text-muted-foreground">Unit Kerja</Label>
+            <Input
+              className="h-9 text-sm"
+              value={main.unitKerja}
+              disabled
             />
           </div>
 

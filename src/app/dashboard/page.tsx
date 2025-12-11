@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 
 import ProgressSummaryCard from "@/components/dashboard/ProgressSummaryCard";
-import ProfileCard from "@/components/dashboard/ProfileCard"; // ⬅️ TAMBAHAN
+import ProfileCard from "@/components/dashboard/ProfileCard";
 
 import { Label } from "@/components/ui/label";
 import {
@@ -27,6 +27,11 @@ type SummaryBox = {
   avg: number;
 };
 
+// 🔗 BASE URL API (sama pola dengan file lain)
+const API_BASE_URL =
+  (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000")
+    .replace(/\/$/, "") + "/api";
+
 function DashboardPage() {
   const router = useRouter();
 
@@ -41,7 +46,7 @@ function DashboardPage() {
   const [yearHard, setYearHard] = React.useState<"all" | number>("all");
   const [yearSoft, setYearSoft] = React.useState<"all" | number>("all");
 
-  // ==== DATA USER ====
+  // ==== DATA USER (untuk mini profile) ====
   const [userName, setUserName] = React.useState<string>("Karyawan");
   const [empNo, setEmpNo] = React.useState<string>("-");
   const [empTitle, setEmpTitle] = React.useState<string>("Karyawan");
@@ -79,10 +84,12 @@ function DashboardPage() {
       return;
     }
 
+    // 👉 Data awal (boleh pake ini biar UI gak kosong duluan)
     setUserName(user.name || "Karyawan");
     setEmpNo(user.nik || "-");
     setEmpTitle(user.jabatan_terakhir || user.role || "Karyawan");
-    setEmpUnit(user.unit || "Unit / Divisi");
+    // 🔧 penting: ambil dari users.unit_kerja
+    setEmpUnit(user.unit_kerja || "Unit / Divisi");
 
     if (user.photo_url) {
       setAvatarUrl(user.photo_url);
@@ -94,6 +101,63 @@ function DashboardPage() {
 
     setLoadingAuth(false);
   }, [router]);
+
+  // ✅ EFFECT BARU
+  // Ambil data profil lengkap dari endpoint yang sama dengan halaman Profile:
+  // GET /api/karyawan/profile → EmployeeProfileController@showSelf
+  React.useEffect(() => {
+    if (loadingAuth) return;
+
+    let cancelled = false;
+
+    async function loadProfileMini() {
+      try {
+        const token = getToken();
+        if (!token) return;
+
+        const res = await fetch(`${API_BASE_URL}/karyawan/profile`, {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) return;
+
+        const json = await res.json();
+        if (cancelled) return;
+
+        const user = json.data?.user ?? {};
+        const profile = json.data?.profile ?? {};
+
+        const nama =
+          profile.nama_lengkap || user.name || "Karyawan";
+
+        setUserName(nama);
+        setEmpNo(profile.nik || user.nik || "-");
+        setEmpTitle(
+          profile.jabatan_terakhir || user.jabatan_terakhir || user.role || "Karyawan",
+        );
+
+        // Unit kerja: prioritas dari users.unit_kerja (di-assign admin),
+        // fallback profile.unit_kerja kalau suatu saat dipakai.
+        const unit =
+          user.unit_kerja || profile.unit_kerja || "Unit / Divisi";
+        setEmpUnit(unit);
+
+        setAvatarUrl(profile.photo_url || avatarUrl || null);
+      } catch (e) {
+        // mini profile gagal load = diam aja, pakai data awal dari auth-storage
+        console.error("Gagal load mini profile:", e);
+      }
+    }
+
+    void loadProfileMini();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadingAuth, avatarUrl]);
 
   // 🔧 Helper: normalisasi list tahun dari field apa pun
   function normalizeYears(raw: any): number[] {
@@ -115,12 +179,13 @@ function DashboardPage() {
       const data = await apiKaryawanSummary(token, tahun);
       return data;
     },
-    []
+    [],
   );
 
   /**
    * 🔹 Load awal dashboard:
    * - pakai tahun "all" → isi awal summary + list tahun
+   * - TIDAK menyentuh lagi mini profile (sudah di-handle effect di atas)
    */
   React.useEffect(() => {
     if (loadingAuth) return;
@@ -133,19 +198,12 @@ function DashboardPage() {
         const data: any = await fetchSummary("all");
         if (!data) return;
 
-        const profile = data.profile ?? {};
-        if (profile.name) setUserName(profile.name);
-        if (profile.nik) setEmpNo(profile.nik);
-        if (profile.jabatan) setEmpTitle(profile.jabatan);
-        if (profile.unit_kerja) setEmpUnit(profile.unit_kerja);
-        setAvatarUrl(profile.photo_url || null);
-
         // 🔹 Tahun per tipe (kalau backend sudah kirim per-type, kita pakai itu)
         const yearsHard = normalizeYears(
-          data.available_years_hard ?? data.available_years ?? []
+          data.available_years_hard ?? data.available_years ?? [],
         );
         const yearsSoft = normalizeYears(
-          data.available_years_soft ?? data.available_years ?? []
+          data.available_years_soft ?? data.available_years ?? [],
         );
 
         setYearOptionsHard(yearsHard);
@@ -252,7 +310,7 @@ function DashboardPage() {
                       const yearsHard = normalizeYears(
                         data.available_years_hard ??
                           data.available_years ??
-                          []
+                          [],
                       );
                       setYearOptionsHard(yearsHard);
 
@@ -262,7 +320,7 @@ function DashboardPage() {
                         total: Number(hard.total ?? 0),
                         tercapai: Number(hardStatus.tercapai ?? 0),
                         tidakTercapai: Number(
-                          hardStatus.tidak_tercapai ?? 0
+                          hardStatus.tidak_tercapai ?? 0,
                         ),
                         avg: Number(hard.avg_nilai ?? 0),
                       });
@@ -271,7 +329,7 @@ function DashboardPage() {
                     } catch (err: any) {
                       console.error(err);
                       setErrorSummary(
-                        err.message || "Gagal mengambil summary hard"
+                        err.message || "Gagal mengambil summary hard",
                       );
                     } finally {
                       setLoadingSummary(false);
@@ -329,7 +387,7 @@ function DashboardPage() {
                       const yearsSoft = normalizeYears(
                         data.available_years_soft ??
                           data.available_years ??
-                          []
+                          [],
                       );
                       setYearOptionsSoft(yearsSoft);
 
@@ -339,7 +397,7 @@ function DashboardPage() {
                         total: Number(soft.total ?? 0),
                         tercapai: Number(softStatus.tercapai ?? 0),
                         tidakTercapai: Number(
-                          softStatus.tidak_tercapai ?? 0
+                          softStatus.tidak_tercapai ?? 0,
                         ),
                         avg: Number(soft.avg_nilai ?? 0),
                       });
@@ -348,7 +406,7 @@ function DashboardPage() {
                     } catch (err: any) {
                       console.error(err);
                       setErrorSummary(
-                        err.message || "Gagal mengambil summary soft"
+                        err.message || "Gagal mengambil summary soft",
                       );
                     } finally {
                       setLoadingSummary(false);

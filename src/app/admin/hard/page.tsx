@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,15 +12,8 @@ import {
   SelectValue,
   SelectItem,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogClose,
-} from "@/components/ui/dialog";
 import { Info } from "lucide-react";
+import { getToken, getUser, clearAuth } from "@/lib/auth-storage";
 
 /* ====================== TYPES ====================== */
 
@@ -29,215 +24,126 @@ type EmployeeRow = {
   unitKerja: string;
 };
 
-type HardItem = {
-  idKey: string; // key internal utk React & toggle
-  displayId: string; // ID kompetensi yang ditampilkan
-  kode: string;
-  nama: string;
-  jobFamily: string;
-  subJob: string;
-  status: string; // lowercase dari API
-  nilai: number | null;
-  deskripsi: string;
+type ApiMeta = {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
 };
 
-type YearHistory = {
-  year: number;
-  items: HardItem[];
-};
+/* ====================== API CONFIG ====================== */
 
-/* ====================== DUMMY DATA ADMIN ====================== */
-
-const EMPLOYEES: EmployeeRow[] = [
-  {
-    id: "emp-001",
-    nik: "SGN001",
-    nama: "Andi Setiawan",
-    unitKerja: "HR & People Development",
-  },
-  {
-    id: "emp-002",
-    nik: "SGN002",
-    nama: "Budi Santoso",
-    unitKerja: "Plant / Pabrik",
-  },
-  {
-    id: "emp-003",
-    nik: "SGN003",
-    nama: "Citra Lestari",
-    unitKerja: "Finance & Accounting",
-  },
-];
-
-const HARD_HISTORY: Record<string, YearHistory[]> = {
-  "emp-001": [
-    {
-      year: 2023,
-      items: [
-        {
-          idKey: "emp-001-2023-HC01",
-          displayId: "HC-01-2023-HR",
-          kode: "HC-01",
-          nama: "Penguasaan Proses Bisnis",
-          jobFamily: "HR",
-          subJob: "People Development",
-          status: "tercapai",
-          nilai: 82,
-          deskripsi: "Memahami alur proses bisnis HR lintas unit.",
-        },
-        {
-          idKey: "emp-001-2023-HC02",
-          displayId: "HC-02-2023-HR",
-          kode: "HC-02",
-          nama: "Analisis Data SDM",
-          jobFamily: "HR",
-          subJob: "People Development",
-          status: "tidak tercapai",
-          nilai: 69,
-          deskripsi: "Perlu pendampingan dalam advanced analytics.",
-        },
-      ],
-    },
-    {
-      year: 2024,
-      items: [
-        {
-          idKey: "emp-001-2024-HC01",
-          displayId: "HC-01-2024-HR",
-          kode: "HC-01",
-          nama: "Penguasaan Proses Bisnis",
-          jobFamily: "HR",
-          subJob: "People Development",
-          status: "tercapai",
-          nilai: 86,
-          deskripsi: "Menjadi rujukan tim lain dalam proses HR.",
-        },
-        {
-          idKey: "emp-001-2024-HC02",
-          displayId: "HC-02-2024-HR",
-          kode: "HC-02",
-          nama: "Analisis Data SDM",
-          jobFamily: "HR",
-          subJob: "People Development",
-          status: "tercapai",
-          nilai: 77,
-          deskripsi: "Menyusun dashboard dan insight secara mandiri.",
-        },
-      ],
-    },
-  ],
-  "emp-002": [
-    {
-      year: 2023,
-      items: [
-        {
-          idKey: "emp-002-2023-HC03",
-          displayId: "HC-03-2023-PLT",
-          kode: "HC-03",
-          nama: "Operasional Pabrik",
-          jobFamily: "Plant",
-          subJob: "Produksi",
-          status: "tercapai",
-          nilai: 75,
-          deskripsi: "Mampu mengoperasikan mesin utama sesuai SOP.",
-        },
-      ],
-    },
-    {
-      year: 2024,
-      items: [
-        {
-          idKey: "emp-002-2024-HC03",
-          displayId: "HC-03-2024-PLT",
-          kode: "HC-03",
-          nama: "Operasional Pabrik",
-          jobFamily: "Plant",
-          subJob: "Produksi",
-          status: "tercapai",
-          nilai: 79,
-          deskripsi: "Konsisten menjaga performa dan safety.",
-        },
-      ],
-    },
-  ],
-  "emp-003": [
-    {
-      year: 2022,
-      items: [
-        {
-          idKey: "emp-003-2022-HC04",
-          displayId: "HC-04-2022-FIN",
-          kode: "HC-04",
-          nama: "Pengelolaan Anggaran",
-          jobFamily: "Finance",
-          subJob: "Accounting",
-          status: "tercapai",
-          nilai: 81,
-          deskripsi: "Menyusun budget unit kerja dengan rapi.",
-        },
-      ],
-    },
-    {
-      year: 2023,
-      items: [
-        {
-          idKey: "emp-003-2023-HC04",
-          displayId: "HC-04-2023-FIN",
-          kode: "HC-04",
-          nama: "Pengelolaan Anggaran",
-          jobFamily: "Finance",
-          subJob: "Accounting",
-          status: "tercapai",
-          nilai: 85,
-          deskripsi: "Akurat dan tepat waktu dalam pelaporan.",
-        },
-      ],
-    },
-  ],
-};
-
-/* ====================== UTIL ====================== */
-
-const pillClass = (s?: string | null) => {
-  const lower = (s ?? "").toLowerCase();
-  const base =
-    "inline-flex items-center rounded-full px-3 py-1 text-[13px] font-medium ring-1";
-  if (lower === "tercapai") {
-    return `${base} bg-emerald-50 text-emerald-700 ring-emerald-200`;
-  }
-  if (lower === "tidak tercapai") {
-    return `${base} bg-amber-50 text-amber-700 ring-amber-200`;
-  }
-  return `${base} bg-zinc-50 text-zinc-700 ring-zinc-200`;
-};
-
-function formatStatus(status: string | null | undefined) {
-  if (!status) return "–";
-  const lower = status.toLowerCase();
-  if (lower === "tercapai") return "Tercapai";
-  if (lower === "tidak tercapai") return "Tidak Tercapai";
-  return lower.charAt(0).toUpperCase() + lower.slice(1);
-}
+const API_BASE_URL =
+  (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000")
+    .replace(/\/$/, "") + "/api";
 
 /* ====================== PAGE ====================== */
 
-export default function AdminHardCompetencyPage() {
+export default function AdminHardPage() {
+  const router = useRouter();
+
   const [search, setSearch] = React.useState("");
   const [unitFilter, setUnitFilter] = React.useState<string>("all");
 
-  const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [selectedEmployee, setSelectedEmployee] =
-    React.useState<EmployeeRow | null>(null);
-  const [selectedYear, setSelectedYear] = React.useState<string>("");
+  const [employees, setEmployees] = React.useState<EmployeeRow[]>([]);
+  const [meta, setMeta] = React.useState<ApiMeta | null>(null);
 
-  const [openSet, setOpenSet] = React.useState<Set<string>>(new Set());
+  const [loadingAuth, setLoadingAuth] = React.useState(true);
+  const [loadingData, setLoadingData] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  /* ========== CEK AUTH (ADMIN) ========== */
+  React.useEffect(() => {
+    const token = getToken();
+    const user = getUser();
+
+    if (!token || !user) {
+      clearAuth();
+      router.push("/login");
+      return;
+    }
+
+    // kalau mau batasi hanya admin:
+    // if (user.role !== "admin") { router.push("/"); return; }
+
+    setLoadingAuth(false);
+  }, [router]);
+
+  /* ========== LOAD DATA KARYAWAN (BACKEND PAGINATION) ========== */
+  const loadEmployees = React.useCallback(async (page: number = 1) => {
+    const token = getToken();
+    if (!token) return;
+
+    setLoadingData(true);
+    setError(null);
+
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/admin/karyawan?page=${page}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error(
+          `Gagal memuat daftar karyawan (status ${res.status})`
+        );
+      }
+
+      const json: any = await res.json();
+      const list: any[] = json.data ?? [];
+      const meta: ApiMeta | null = json.meta ?? null;
+
+      const mapped: EmployeeRow[] = list.map((item) => ({
+        id: String(item.id),
+        nik: item.nik ?? "-",
+        nama: item.name ?? "-",
+        // sementara unitKerja belum ada di API → isi "-" dulu
+        unitKerja: item.unit_kerja ?? "-",
+      }));
+
+      setEmployees(mapped);
+      setMeta(
+        meta ?? {
+          current_page: page,
+          per_page: list.length || 10,
+          total: list.length,
+          last_page: 1,
+        }
+      );
+    } catch (err: any) {
+      console.error(err);
+      setError(
+        err?.message || "Terjadi kesalahan saat memuat daftar karyawan."
+      );
+      setEmployees([]);
+      setMeta(null);
+    } finally {
+      setLoadingData(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!loadingAuth) {
+      loadEmployees(1);
+    }
+  }, [loadingAuth, loadEmployees]);
+
+  /* ========== FILTER (DI ATAS DATA PAGE) ========== */
 
   const unitOptions = React.useMemo(
-    () => Array.from(new Set(EMPLOYEES.map((e) => e.unitKerja))),
-    []
+    () => Array.from(new Set(employees.map((e) => e.unitKerja))).filter(
+      (u) => u && u !== "-"
+    ),
+    [employees]
   );
 
-  const filteredEmployees = EMPLOYEES.filter((emp) => {
+  const filteredEmployees = employees.filter((emp) => {
     const key = search.trim().toLowerCase();
     const matchSearch =
       key === "" ||
@@ -250,39 +156,22 @@ export default function AdminHardCompetencyPage() {
     return matchSearch && matchUnit;
   });
 
-  const activeHistory: YearHistory[] =
-    (selectedEmployee && HARD_HISTORY[selectedEmployee.id]) || [];
-
-  const yearOptions = activeHistory
-    .map((h) => h.year)
-    .sort((a, b) => a - b);
-
-  const currentYearHistory =
-    activeHistory.find((h) => String(h.year) === selectedYear) || null;
+  const safeCurrentPage = meta?.current_page ?? 1;
+  const totalPages = meta?.last_page ?? 1;
+  const baseNo = meta ? (meta.current_page - 1) * meta.per_page : 0;
 
   const handleOpenDetail = (emp: EmployeeRow) => {
-    setSelectedEmployee(emp);
-
-    const history = HARD_HISTORY[emp.id] ?? [];
-    if (history.length > 0) {
-      const latest = history
-        .map((h) => h.year)
-        .sort((a, b) => b - a)[0];
-      setSelectedYear(String(latest));
-    } else {
-      setSelectedYear("");
-    }
-
-    setOpenSet(new Set());
-    setDialogOpen(true);
+    // ⬇⬇ per detail kamu punya endpoint by NIK, jadi param URL = NIK
+    router.push(`/admin/hard/${emp.nik}`);
   };
 
-  const toggleRow = (idKey: string) =>
-    setOpenSet((prev) => {
-      const next = new Set(prev);
-      next.has(idKey) ? next.delete(idKey) : next.add(idKey);
-      return next;
-    });
+  if (loadingAuth) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center text-sm text-muted-foreground">
+        Memeriksa sesi...
+      </div>
+    );
+  }
 
   return (
     <section className="max-w-6xl mx-auto space-y-5 px-3 sm:px-4 lg:px-0">
@@ -291,9 +180,17 @@ export default function AdminHardCompetencyPage() {
         <h1 className="text-xl font-semibold text-zinc-900">
           Hard Competency
         </h1>
+        <p className="text-xs text-zinc-500 mt-1">Pilih karyawan</p>
       </div>
 
-      {/* Search + filter (layout lama, tapi digeser kanan pakai padding) */}
+      {/* Error */}
+      {error && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs sm:text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Search + filter */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pr-4 sm:pr-10">
         <div className="w-full sm:max-w-sm">
           <Input
@@ -340,7 +237,7 @@ export default function AdminHardCompetencyPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredEmployees.length === 0 && (
+            {filteredEmployees.length === 0 && !loadingData && (
               <tr>
                 <td
                   colSpan={5}
@@ -351,269 +248,92 @@ export default function AdminHardCompetencyPage() {
               </tr>
             )}
 
-            {filteredEmployees.map((emp, idx) => (
-              <tr
-                key={emp.id}
-                className={`border-b transition ${
-                  idx % 2 === 0 ? "bg-white" : "bg-zinc-50/70"
-                }`}
-              >
-                <td className="py-3 px-2 text-center align-middle">
-                  {idx + 1}
-                </td>
-                <td className="py-3 px-2 align-middle text-zinc-800 whitespace-nowrap">
-                  {emp.nik}
-                </td>
-                <td className="py-3 px-2 align-middle text-zinc-900">
-                  {emp.nama}
-                </td>
-                <td className="py-3 px-2 align-middle text-zinc-700">
-                  {emp.unitKerja}
-                </td>
-                <td className="py-3 px-2 text-center align-middle">
-                  <Button
-                    size="sm"
-                    className="h-9 rounded-lg px-4 text-[13px] font-semibold"
-                    variant="outline"
-                    onClick={() => handleOpenDetail(emp)}
-                  >
-                    <Info className="h-3.5 w-3.5 mr-1" />
-                    Detail
-                  </Button>
+            {loadingData && (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="py-6 text-center text-sm text-muted-foreground"
+                >
+                  Memuat data karyawan...
                 </td>
               </tr>
-            ))}
+            )}
+
+            {filteredEmployees.map((emp, idx) => {
+              const no = baseNo + idx + 1;
+              return (
+                <tr
+                  key={emp.id}
+                  className={`border-b transition ${
+                    idx % 2 === 0 ? "bg-white" : "bg-zinc-50/70"
+                  }`}
+                >
+                  <td className="py-3 px-2 text-center align-middle">
+                    {no}
+                  </td>
+                  <td className="py-3 px-2 align-middle text-zinc-800 whitespace-nowrap">
+                    {emp.nik}
+                  </td>
+                  <td className="py-3 px-2 align-middle text-zinc-900">
+                    {emp.nama}
+                  </td>
+                  <td className="py-3 px-2 align-middle text-zinc-700">
+                    {emp.unitKerja}
+                  </td>
+                  <td className="py-3 px-2 text-center align-middle">
+                    <Button
+                      size="sm"
+                      className="h-9 rounded-lg px-4 text-[13px] font-semibold"
+                      variant="outline"
+                      onClick={() => handleOpenDetail(emp)}
+                    >
+                      <Info className="h-3.5 w-3.5 mr-1" />
+                      Detail
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* Dialog detail */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-full max-w-[1400px] max-h-[90vh] overflow-y-auto p-6 rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-sm sm:text-base">
-              Detail Hard Competency Karyawan
-            </DialogTitle>
-            <DialogDescription className="text-xs sm:text-sm">
-              Riwayat nilai hard competency per tahun untuk karyawan terpilih.
-            </DialogDescription>
-          </DialogHeader>
+      {/* Pagination: pakai meta dari backend */}
+      {meta && meta.total > 0 && (
+        <div className="mt-4 flex items-center justify-between">
+          {/* kiri */}
+          <span className="text-xs text-zinc-600">
+            Halaman{" "}
+            <span className="font-semibold">{safeCurrentPage}</span> dari{" "}
+            <span className="font-semibold">{totalPages}</span>
+          </span>
 
-          {selectedEmployee ? (
-            <div className="space-y-4 pb-2 w-full">
-              {/* Info karyawan */}
-              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-6 py-4 text-sm text-zinc-700 w-full">
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">
-                      Nama Karyawan
-                    </p>
-                    <p className="mt-0.5 text-sm font-medium text-zinc-900">
-                      {selectedEmployee.nama}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">
-                      NIK
-                    </p>
-                    <p className="mt-0.5 text-sm font-medium text-zinc-900">
-                      {selectedEmployee.nik}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">
-                      Unit Kerja
-                    </p>
-                    <p className="mt-0.5 text-sm font-medium text-zinc-900">
-                      {selectedEmployee.unitKerja}
-                    </p>
-                  </div>
-                </div>
-              </div>
+          {/* kanan */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={safeCurrentPage <= 1 || loadingData}
+              onClick={() =>
+                !loadingData && loadEmployees(safeCurrentPage - 1)
+              }
+            >
+              Prev
+            </Button>
 
-              {/* Pilih tahun */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-zinc-800">
-                    Tahun Penilaian
-                  </p>
-                  <p className="text-[11px] text-zinc-500">
-                    Pilih tahun untuk melihat daftar hard competency.
-                  </p>
-                </div>
-                <div className="w-32">
-                  <Select
-                    value={selectedYear}
-                    onValueChange={(val) => {
-                      setSelectedYear(val);
-                      setOpenSet(new Set());
-                    }}
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Pilih tahun" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {yearOptions.map((y) => (
-                        <SelectItem key={y} value={String(y)}>
-                          {y}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Tabel riwayat */}
-              <div className="border border-zinc-200 rounded-md overflow-x-auto w-full">
-                {(!currentYearHistory ||
-                  currentYearHistory.items.length === 0) ? (
-                  <p className="px-4 py-3 text-xs sm:text-sm text-zinc-500">
-                    Belum ada data nilai untuk tahun{" "}
-                    {selectedYear || "(tahun belum dipilih)"}.
-                  </p>
-                ) : (
-                  <table className="w-full text-sm sm:text-[15px] border-collapse">
-                    <thead>
-                      <tr className="text-zinc-700 bg-zinc-50 border-b">
-                        <th className="py-3 px-2 text-center w-[60px]">
-                          No
-                        </th>
-                        <th className="py-3 px-2 text-left">Kompetensi</th>
-                        <th className="py-3 px-2 text-center w-[140px]">
-                          Status
-                        </th>
-                        <th className="py-3 px-2 text-center w-[90px]">
-                          Nilai
-                        </th>
-                        <th className="py-3 px-2 text-center w-[110px]">
-                          Detail
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {currentYearHistory.items.map((item, idx) => {
-                        const open = openSet.has(item.idKey);
-                        return (
-                          <React.Fragment key={item.idKey}>
-                            <tr
-                              className={`border-b transition ${
-                                open
-                                  ? "bg-zinc-50/60"
-                                  : idx % 2 === 0
-                                  ? "bg-white hover:bg-zinc-50"
-                                  : "bg-zinc-50/60 hover:bg-zinc-100"
-                              }`}
-                            >
-                              <td className="py-3 px-2 text-center align-middle">
-                                {idx + 1}
-                              </td>
-                              <td className="py-3 px-2 align-middle">
-                                <span className="font-semibold text-zinc-900">
-                                  {item.nama}
-                                </span>
-                              </td>
-                              <td className="py-3 px-2 text-center align-middle">
-                                <span className={pillClass(item.status)}>
-                                  {formatStatus(item.status)}
-                                </span>
-                              </td>
-                              <td className="py-3 px-2 text-center align-middle">
-                                {item.nilai ?? "-"}
-                              </td>
-                              <td className="py-3 px-2 text-center align-middle">
-                                <Button
-                                  size="sm"
-                                  className="h-9 rounded-lg px-4 text-[13px] font-semibold"
-                                  onClick={() => toggleRow(item.idKey)}
-                                >
-                                  {open ? "Tutup" : "Detail"}
-                                </Button>
-                              </td>
-                            </tr>
-
-                            {open && (
-                              <tr className="bg-zinc-50">
-                                <td colSpan={5} className="p-0">
-                                  <div className="mx-2 sm:mx-4 lg:mx-6 mb-4 mt-0 rounded-xl bg-white shadow-[0_2px_8px_rgba(15,23,42,0.03)] border border-zinc-100">
-                                    <div className="px-6 py-4 space-y-4">
-                                      {/* 4 kolom info utama */}
-                                      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                                        <div>
-                                          <p className="text-xs text-zinc-500">
-                                            ID Kompetensi
-                                          </p>
-                                          <p className="text-[15px] font-semibold">
-                                            {item.displayId}
-                                          </p>
-                                        </div>
-                                        <div>
-                                          <p className="text-xs text-zinc-500">
-                                            Kode Kompetensi
-                                          </p>
-                                          <p className="text-[15px] font-semibold">
-                                            {item.kode}
-                                          </p>
-                                        </div>
-                                        <div>
-                                          <p className="text-xs text-zinc-500">
-                                            Job Family Kompetensi
-                                          </p>
-                                          <p className="text-[15px] font-semibold">
-                                            {item.jobFamily}
-                                          </p>
-                                        </div>
-                                        <div>
-                                          <p className="text-xs text-zinc-500">
-                                            Sub Job Family Kompetensi
-                                          </p>
-                                          <p className="text-[15px] font-semibold">
-                                            {item.subJob}
-                                          </p>
-                                        </div>
-                                      </div>
-
-                                      {/* Deskripsi */}
-                                      <div className="pt-3 border-t border-zinc-100">
-                                        <p className="mb-1 text-xs text-zinc-500">
-                                          Deskripsi
-                                        </p>
-                                        <p className="text-[15px] leading-relaxed text-zinc-800">
-                                          {item.deskripsi ||
-                                            "Belum ada deskripsi untuk kompetensi ini."}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              <div className="flex justify-end">
-                <DialogClose asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-3 text-xs"
-                  >
-                    Tutup
-                  </Button>
-                </DialogClose>
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs sm:text-sm text-zinc-500">
-              Tidak ada karyawan yang dipilih.
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={safeCurrentPage >= totalPages || loadingData}
+              onClick={() =>
+                !loadingData && loadEmployees(safeCurrentPage + 1)
+              }
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

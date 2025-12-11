@@ -15,7 +15,7 @@ import { ProfilePersonalCard } from "@/components/profile/ProfilePersonalCard";
 import { ProfilePerformanceCard } from "@/components/profile/ProfilePerformanceCard";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 
-// ⬇️ Tambah ini
+// React Query (untuk sync topbar / dashboard)
 import { useQueryClient } from "@tanstack/react-query";
 
 // =======================
@@ -27,6 +27,7 @@ type UserApi = {
   name: string;
   email: string;
   role: string;
+  unit_kerja?: string | null;
 };
 
 type ProfileApi = {
@@ -81,6 +82,7 @@ export default function ProfilePage() {
   const [main, setMain] = React.useState<MainProfileState>({
     namaLengkap: "-",
     jabatanTerakhir: "-",
+    unitKerja: "-",
     nikPn: "-",
     handphone: "-",
     email: "-",
@@ -96,6 +98,7 @@ export default function ProfilePage() {
 
   const [form, setForm] = React.useState<ProfileFormState>({
     jabatanTerakhir: "",
+    unitKerja: "", // tetap ada di state untuk display, tapi TIDAK dikirim ke backend
     gelarAkademik: "",
     pendidikan: "",
     noKtp: "",
@@ -146,10 +149,12 @@ export default function ProfilePage() {
 
         const nama = p.nama_lengkap || user.name;
 
-        // MAIN STATE
+        // MAIN STATE (unitKerja diambil dari profile.unit_kerja
+        // yang sudah diset backend dari users.unit_kerja)
         const mainState: MainProfileState = {
           namaLengkap: fix(nama),
           jabatanTerakhir: fix(p.jabatan_terakhir),
+          unitKerja: fix(p.unit_kerja),
           nikPn: fix(p.nik || user.nik),
           handphone: fix(p.handphone),
           email: fix(p.email_pribadi || user.email),
@@ -158,9 +163,10 @@ export default function ProfilePage() {
         };
         setMain(mainState);
 
-        // FORM STATE
+        // FORM STATE (unitKerja hanya untuk display, tidak akan dikirim)
         setForm({
           jabatanTerakhir: p.jabatan_terakhir ?? "",
+          unitKerja: p.unit_kerja ?? "",
           gelarAkademik: p.gelar_akademik ?? "",
           pendidikan: p.pendidikan ?? "",
           noKtp: p.no_ktp ?? "",
@@ -228,6 +234,7 @@ export default function ProfilePage() {
 
       const payload = {
         jabatan_terakhir: emptyToNull(form.jabatanTerakhir),
+        // ❌ unit_kerja sengaja TIDAK dikirim
         gelar_akademik: emptyToNull(form.gelarAkademik),
         pendidikan: emptyToNull(form.pendidikan),
         no_ktp: emptyToNull(form.noKtp),
@@ -246,7 +253,7 @@ export default function ProfilePage() {
       };
 
       const res = await fetch(UPDATE_PROFILE_URL, {
-        method: "POST",
+        method: "POST", // route kamu pakai POST
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
@@ -257,7 +264,7 @@ export default function ProfilePage() {
 
       if (!res.ok) throw new Error("Gagal menyimpan profil.");
 
-      // update view singkat setelah save
+      // update view singkat setelah save (unitKerja TIDAK berubah di sini)
       setMain((prev) => ({
         ...prev,
         jabatanTerakhir: fix(form.jabatanTerakhir),
@@ -284,7 +291,7 @@ export default function ProfilePage() {
         achievements: [fix(form.pencapaian || "-")],
       });
 
-      // ⬇️ Penting: kasih tahu React Query supaya TopBar refetch data profil
+      // biar mini profile / topbar ikut update
       queryClient.invalidateQueries({ queryKey: ["profile", "me"] });
 
       setIsEditing(false);

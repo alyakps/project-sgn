@@ -4,6 +4,7 @@ export type KeyVal = { label: string; value: string };
 export type MainProfileState = {
   namaLengkap: string;
   jabatanTerakhir: string;
+  unitKerja: string;
   nikPn: string;
   handphone: string;
   email: string;
@@ -18,6 +19,7 @@ export type PerformanceState = {
 
 export type ProfileFormState = {
   jabatanTerakhir: string;
+  unitKerja: string;
   gelarAkademik: string;
   pendidikan: string;
   noKtp: string;

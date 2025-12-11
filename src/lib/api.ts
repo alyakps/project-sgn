@@ -267,6 +267,69 @@ export async function apiAdminListKaryawan(
   return { items, meta };
 }
 
+/* ====================== ADMIN – CREATE KARYAWAN ====================== */
+
+export type CreateKaryawanPayload = {
+  role: "karyawan" | "admin";
+  nik: string;
+  name: string;
+  unit_kerja: string;
+  jabatan_terakhir?: string | null;
+  email: string;
+  password: string;
+  password_confirmation: string;
+};
+
+/**
+ * POST /api/admin/karyawan
+ * Body: { role, nik, name, unit_kerja, jabatan_terakhir, email, password, password_confirmation }
+ */
+export async function apiAdminCreateKaryawan(
+  token: string,
+  payload: CreateKaryawanPayload
+) {
+  const res = await fetch(`${API_URL}/api/admin/karyawan`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json().catch(() => ({} as any));
+
+  if (!res.ok) {
+    let message = json.message || "Gagal membuat karyawan.";
+
+    if (json.errors && typeof json.errors === "object") {
+      const firstField = Object.keys(json.errors)[0];
+      if (firstField && Array.isArray(json.errors[firstField])) {
+        message = json.errors[firstField][0] || message;
+      }
+    }
+
+    throw new Error(message);
+  }
+
+  // contoh response:
+  // { "message": "Karyawan berhasil dibuat.", "data": { "user": {...} } }
+  return json as {
+    message: string;
+    data: {
+      user: {
+        id: number;
+        nik: string;
+        name: string;
+        email: string;
+        role: string;
+        unit_kerja: string;
+      };
+    };
+  };
+}
+
 /* ====================== ADMIN – RESET PASSWORD KARYAWAN ====================== */
 
 /**
@@ -298,4 +361,81 @@ export async function apiAdminResetKaryawanPassword(
 
   // backend kirim { message, default_password }
   return json as { message: string; default_password: string };
+}
+
+/* ====================== ADMIN – DELETE KARYAWAN ====================== */
+
+export async function apiAdminDeleteKaryawan(token: string, userId: number) {
+  const res = await fetch(`${API_URL}/api/admin/karyawan/${userId}`, {
+    method: "DELETE",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const json = await res.json().catch(() => ({} as any));
+
+  if (!res.ok) {
+    const msg = json.message || "Gagal menghapus karyawan.";
+    throw new Error(msg);
+  }
+
+  // backend biasanya respond { message: "..." }
+  return json;
+}
+
+/* ====================== ADMIN – IMPORT KARYAWAN (EXCEL) ====================== */
+
+/**
+ * Import karyawan via Excel.
+ * Endpoint: POST /api/admin/import-karyawan
+ * Body: form-data { file: xls/xlsx }
+ */
+export async function apiAdminImportKaryawan(token: string, file: File) {
+  const formData = new FormData();
+  // pastikan nama field "file" sama dengan yang diterima AdminController@importKaryawan
+  formData.append("file", file);
+
+  const res = await fetch(`${API_URL}/api/admin/import-karyawan`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      // Jangan set Content-Type manual, biar browser yang set boundary multipart
+    },
+    body: formData,
+  });
+
+  const json = await res.json().catch(() => ({} as any));
+
+  if (!res.ok) {
+    const msg =
+      json.message ||
+      "Gagal mengimpor karyawan. Pastikan format file sudah sesuai.";
+    throw new Error(msg);
+  }
+
+  return json;
+}
+
+/* ====================== MASTER DATA ====================== */
+
+export async function apiGetMasterUnitKerja(token: string): Promise<string[]> {
+  const res = await fetch(`${API_URL}/api/master/unit-kerja`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const json = await res.json().catch(() => ({} as any));
+
+  if (!res.ok) {
+    const msg = json.message || "Gagal mengambil data unit kerja.";
+    throw new Error(msg);
+  }
+
+  const list = Array.isArray(json.data) ? json.data : [];
+  return list as string[];
 }

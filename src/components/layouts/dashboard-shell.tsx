@@ -78,13 +78,11 @@ export function DashboardShell({ children, role }: DashboardShellProps) {
           },
         ]
       : [
-          // ⬇️⬇️ DI SINI YANG DIGANTI: /admin  ->  /admin/dashboard
           {
             href: "/admin",
             label: "Dashboard",
             checkActive: () =>
-              isActive("/admin") &&
-              pathname === "/admin",
+              isActive("/admin") && pathname === "/admin",
             icon: <LayoutDashboard className="h-5 w-5" />,
           },
           {
@@ -113,21 +111,33 @@ export function DashboardShell({ children, role }: DashboardShellProps) {
           },
         ];
 
-  // settings sama kayak punyamu, biar nggak berubah behaviour-nya
-  const settingsItems = [
-    {
-      href: "/dashboard/profile",
-      label: "Profile",
-      checkActive: () => isActive("/dashboard/profile"),
-      icon: <User className="h-5 w-5" />,
-    },
-    {
-      href: "/",
-      label: "Logout",
-      checkActive: () => false,
-      icon: <LogOut className="h-5 w-5" />,
-    },
-  ];
+  // Settings di sidebar:
+  // - Karyawan: Profile + Logout
+  // - Admin: hanya Logout (Profile dihapus dari sidebar)
+  const settingsItems =
+    role === "admin"
+      ? [
+          {
+            href: "/",
+            label: "Logout",
+            checkActive: () => false,
+            icon: <LogOut className="h-5 w-5" />,
+          },
+        ]
+      : [
+          {
+            href: "/dashboard/profile",
+            label: "Profile",
+            checkActive: () => isActive("/dashboard/profile"),
+            icon: <User className="h-5 w-5" />,
+          },
+          {
+            href: "/",
+            label: "Logout",
+            checkActive: () => false,
+            icon: <LogOut className="h-5 w-5" />,
+          },
+        ];
 
   return (
     <div className="h-screen w-full bg-zinc-50 flex flex-col overflow-hidden">
@@ -149,6 +159,11 @@ export function DashboardShell({ children, role }: DashboardShellProps) {
           >
             {/* Items */}
             <div className="flex-1 flex flex-col gap-2 md:gap-2.5 overflow-hidden">
+              {/* ✅ Overview title sekarang di ATAS menu */}
+              <div className="hidden md:block text-[17px] font-semibold uppercase tracking-wide text-zinc-900 mb-2">
+                Overview
+              </div>
+
               {overviewItems.map((item) => (
                 <SidebarItem
                   key={item.href}
@@ -158,10 +173,6 @@ export function DashboardShell({ children, role }: DashboardShellProps) {
                   icon={item.icon}
                 />
               ))}
-
-              <div className="hidden md:block text-[17px] font-semibold uppercase tracking-wide text-zinc-900 mt-1">
-                Overview
-              </div>
             </div>
 
             {/* Footer */}
@@ -262,6 +273,9 @@ function TopBar() {
   const baseUser = getUser();
   const token = getToken();
 
+  // role dipakai untuk mengatur dropdown (admin vs karyawan)
+  const role = (baseUser?.role as Role | undefined) ?? "karyawan";
+
   const { data } = useQuery({
     queryKey: ["profile", "me", token],
     queryFn: () => fetchProfileSummary(token as string),
@@ -351,7 +365,16 @@ function TopBar() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleGoProfile}>Profile</DropdownMenuItem>
+
+          {/* Dropdown:
+              - Karyawan: Profile + Change Password + Logout
+              - Admin:    Change Password + Logout (Profile di-hide)
+           */}
+          {role !== "admin" && (
+            <DropdownMenuItem onClick={handleGoProfile}>
+              Profile
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={handleChangePassword}>
             Change Password
           </DropdownMenuItem>
