@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  reactCompiler: true,
+  allowedDevOrigins: [
+    "http://localhost:3000",
+    "http://10.10.13.10",
+  ],
 };
 
 export default nextConfig;

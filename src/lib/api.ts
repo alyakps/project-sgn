@@ -339,10 +339,14 @@ export async function apiAdminCreateKaryawan(
  */
 export async function apiAdminResetKaryawanPassword(
   token: string,
-  userId: number
+  nik: string, // ✅ ubah dari number -> string
 ) {
+  const API_BASE_URL =
+    (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000")
+      .replace(/\/$/, "") + "/api";
+
   const res = await fetch(
-    `${API_URL}/api/admin/karyawan/${userId}/reset-password`,
+    `${API_BASE_URL}/admin/karyawan/${encodeURIComponent(nik)}/reset-password`,
     {
       method: "POST",
       headers: {
@@ -352,15 +356,10 @@ export async function apiAdminResetKaryawanPassword(
     }
   );
 
-  const json = await res.json().catch(() => ({} as any));
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || "Gagal reset password");
 
-  if (!res.ok) {
-    const msg = json.message || "Gagal reset password karyawan.";
-    throw new Error(msg);
-  }
-
-  // backend kirim { message, default_password }
-  return json as { message: string; default_password: string };
+  return json;
 }
 
 /* ====================== ADMIN – DELETE KARYAWAN ====================== */
