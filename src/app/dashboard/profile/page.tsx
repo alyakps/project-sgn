@@ -149,12 +149,14 @@ export default function ProfilePage() {
 
         const nama = p.nama_lengkap || user.name;
 
-        // MAIN STATE (unitKerja diambil dari profile.unit_kerja
-        // yang sudah diset backend dari users.unit_kerja)
+        // ✅ FIX: source of truth unit kerja dari users.unit_kerja, fallback profile.unit_kerja
+        const unitKerja = user.unit_kerja ?? p.unit_kerja ?? "";
+
+        // MAIN STATE
         const mainState: MainProfileState = {
           namaLengkap: fix(nama),
           jabatanTerakhir: fix(p.jabatan_terakhir),
-          unitKerja: fix(p.unit_kerja),
+          unitKerja: fix(unitKerja),
           nikPn: fix(p.nik || user.nik),
           handphone: fix(p.handphone),
           email: fix(p.email_pribadi || user.email),
@@ -166,7 +168,7 @@ export default function ProfilePage() {
         // FORM STATE (unitKerja hanya untuk display, tidak akan dikirim)
         setForm({
           jabatanTerakhir: p.jabatan_terakhir ?? "",
-          unitKerja: p.unit_kerja ?? "",
+          unitKerja: unitKerja ?? "",
           gelarAkademik: p.gelar_akademik ?? "",
           pendidikan: p.pendidikan ?? "",
           noKtp: p.no_ktp ?? "",
@@ -317,15 +319,10 @@ export default function ProfilePage() {
           Memuat data profil...
         </p>
       )}
-      {error && (
-        <p className="text-xs sm:text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="text-xs sm:text-sm text-red-600">{error}</p>}
 
       {/* HEADER CARD */}
-      <ProfileHeaderCard
-        main={main}
-        onEdit={() => setIsEditing(true)}
-      />
+      <ProfileHeaderCard main={main} onEdit={() => setIsEditing(true)} />
 
       {/* PERSONAL INFO */}
       <ProfilePersonalCard items={personal} />

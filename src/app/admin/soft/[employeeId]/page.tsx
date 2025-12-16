@@ -60,8 +60,16 @@ type AdminSoftApiData = {
   available_years?: number[];
 };
 
+type ApiMeta = {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+};
+
 type AdminSoftApiResponse = {
   data?: AdminSoftApiData;
+  meta?: ApiMeta;
 };
 
 /* =======================
@@ -83,21 +91,21 @@ function formatStatus(status: string) {
 
 /**
  * Fetch dari endpoint admin:
- * GET /api/admin/karyawan/{nik}/soft-competencies?tahun=XXXX
+ * GET /api/admin/karyawan/{nik}/soft-competencies?tahun=XXXX&page=Y
  */
 async function fetchAdminSoftCompetency(
   nik: string,
-  year?: string
-): Promise<AdminSoftApiData> {
+  year?: string,
+  page?: number
+): Promise<{ data: AdminSoftApiData; meta?: ApiMeta }> {
   const token = getToken();
   if (!token) {
     throw new Error("Sesi login tidak ditemukan. Silakan login kembali.");
   }
 
   const params = new URLSearchParams();
-  if (year) {
-    params.set("tahun", year);
-  }
+  if (year) params.set("tahun", year);
+  if (page) params.set("page", String(page));
 
   const queryString = params.toString();
   const url =
@@ -125,8 +133,10 @@ async function fetchAdminSoftCompetency(
     }
 
     try {
-      const e = await res.json();
-      if ((e as any)?.message) msg += ` - ${(e as any).message}`;
+      const e: unknown = await res.json();
+      if (typeof (e as { message?: unknown })?.message === "string") {
+        msg += ` - ${(e as { message: string }).message}`;
+      }
     } catch {
       // ignore
     }
@@ -142,8 +152,9 @@ async function fetchAdminSoftCompetency(
   }
 
   console.log("[Soft Admin] Data dari API:", data);
+  console.log("[Soft Admin] Meta dari API:", json.meta);
 
-  return data;
+  return { data, meta: json.meta };
 }
 
 /* =======================
@@ -213,16 +224,28 @@ function SoftCompetencyChart({
                 content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
 
-                  const p = payload[0] as any;
+                  const p = payload[0] as unknown as {
+                    payload?: { kode?: string; label?: string };
+                  };
 
                   const kode = p?.payload?.kode ?? "";
                   const label = p?.payload?.label ?? "";
 
                   const score = Number(
-                    payload.find((x: any) => x.dataKey === "value")?.value ?? 0
+                    (
+                      payload as unknown as Array<{
+                        dataKey?: string;
+                        value?: unknown;
+                      }>
+                    ).find((x) => x.dataKey === "value")?.value ?? 0
                   );
                   const avg = Number(
-                    payload.find((x: any) => x.dataKey === "avg")?.value ?? 0
+                    (
+                      payload as unknown as Array<{
+                        dataKey?: string;
+                        value?: unknown;
+                      }>
+                    ).find((x) => x.dataKey === "avg")?.value ?? 0
                   );
 
                   return (
@@ -292,12 +315,14 @@ type SoftCompetencyTableProps = {
   items: Item[];
   loading: boolean;
   hasAnyYear: boolean;
+  startNumber: number; // <-- tambahan untuk nomor lanjut
 };
 
 function SoftCompetencyTable({
   items,
   loading,
   hasAnyYear,
+  startNumber,
 }: SoftCompetencyTableProps) {
   const [openIds, setOpenIds] = React.useState<string[]>([]);
 
@@ -334,7 +359,11 @@ function SoftCompetencyTable({
                       open ? "bg-zinc-50" : "hover:bg-zinc-50"
                     }`}
                   >
-                    <td className="py-3 px-2 text-center">{i + 1}</td>
+                    {/* nomor lanjut per halaman */}
+                    <td className="py-3 px-2 text-center">
+                      {startNumber + i}
+                    </td>
+
                     <td className="py-3 px-2 font-semibold">{r.kode}</td>
                     <td className="py-3 px-2">{r.nama_kompetensi}</td>
                     <td className="py-3 px-2 text-center">
@@ -448,6 +477,10 @@ export default function AdminSoftEmployeePage() {
   const [chart, setChart] = React.useState<ChartItem[]>([]);
   const [items, setItems] = React.useState<Item[]>([]);
 
+  // pagination (minimal)
+  const [meta, setMeta] = React.useState<ApiMeta | null>(null);
+  const [currentPage, setCurrentPage] = React.useState<number>(1);
+
   const [loadingAuth, setLoadingAuth] = React.useState(true);
   const [loadingData, setLoadingData] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -472,7 +505,6 @@ export default function AdminSoftEmployeePage() {
   }, [router]);
 
   /* ========== FETCH DATA ========== */
-
   React.useEffect(() => {
     if (loadingAuth) return;
     if (!employeeNik) return;
@@ -484,11 +516,15 @@ export default function AdminSoftEmployeePage() {
         setLoadingData(true);
         setError(null);
 
-        const data = await fetchAdminSoftCompetency(
+        const { data, meta: metaFromApi } = await fetchAdminSoftCompetency(
           employeeNik,
-          year || undefined
+          year || undefined,
+          currentPage
         );
         if (cancelled) return;
+
+        setMeta(metaFromApi ?? null);
+        setCurrentPage(metaFromApi?.current_page ?? currentPage);
 
         const yearsFromApi =
           data.available_years
@@ -497,7 +533,7 @@ export default function AdminSoftEmployeePage() {
 
         setAvailableYears(yearsFromApi);
 
-        // === FIX PENTING ===
+        // === FIX PENTING (tetap dipertahankan) ===
         // Fetch pertama (year === "") hanya dipakai untuk tahu daftar tahun.
         // Kalau tahun dari API = 0 / null → jangan isi chart/items dulu.
         if (!year) {
@@ -511,14 +547,14 @@ export default function AdminSoftEmployeePage() {
           if (latestYear) {
             setYear(latestYear); // akan memicu fetch ulang dengan tahun spesifik
             setSelectedYear(latestYear);
+            setCurrentPage(1); // reset pagination saat auto set tahun
           }
 
           // JANGAN set chart/items di sini, biarkan fetch kedua yang isi
           return;
         }
 
-        // Kalau sudah ada year (baik dari user pilih atau auto latest),
-        // baru kita isi chart & items dari response.
+        // kalau sudah ada year → isi chart/items
         let effectiveYear = year;
 
         if (!effectiveYear) {
@@ -539,12 +575,17 @@ export default function AdminSoftEmployeePage() {
           "items length:",
           data.items?.length ?? 0
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (cancelled) return;
         console.error("[Soft Admin] Error fetch:", err);
-        setError(err.message ?? "Gagal memuat data soft competency.");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Gagal memuat data soft competency."
+        );
         setChart([]);
         setItems([]);
+        setMeta(null);
       } finally {
         if (!cancelled) {
           setLoadingData(false);
@@ -557,7 +598,7 @@ export default function AdminSoftEmployeePage() {
     return () => {
       cancelled = true;
     };
-  }, [loadingAuth, employeeNik, year]);
+  }, [loadingAuth, employeeNik, year, currentPage]);
 
   if (loadingAuth) {
     return (
@@ -566,6 +607,14 @@ export default function AdminSoftEmployeePage() {
       </div>
     );
   }
+
+  // pagination safe values
+  const safeCurrentPage = meta?.current_page ?? currentPage;
+  const totalPages = meta?.last_page ?? 1;
+
+  // untuk nomor tabel lanjut
+  const perPage = meta?.per_page ?? (items.length > 0 ? items.length : 10);
+  const startNumber = (safeCurrentPage - 1) * perPage + 1;
 
   return (
     <section className="flex flex-col gap-3">
@@ -581,9 +630,7 @@ export default function AdminSoftEmployeePage() {
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h2 className="text-lg font-semibold sm:text-xl">
-            Soft Competency
-          </h2>
+          <h2 className="text-lg font-semibold sm:text-xl">Soft Competency</h2>
         </div>
 
         <div className="flex items-center gap-2">
@@ -593,6 +640,7 @@ export default function AdminSoftEmployeePage() {
             onValueChange={(val) => {
               setYear(val); // trigger fetch untuk tahun tersebut
               setSelectedYear(val);
+              setCurrentPage(1); // reset pagination saat ganti tahun
             }}
             disabled={availableYears.length === 0}
           >
@@ -616,9 +664,7 @@ export default function AdminSoftEmployeePage() {
         </p>
       )}
       {error && (
-        <p className="px-3 text-xs text-red-600 sm:px-5 sm:text-sm">
-          {error}
-        </p>
+        <p className="px-3 text-xs text-red-600 sm:px-5 sm:text-sm">{error}</p>
       )}
 
       {/* CHART */}
@@ -632,11 +678,50 @@ export default function AdminSoftEmployeePage() {
 
       {/* TABLE */}
       <SoftCompetencyTable
-        key={selectedYear || "no-year"}
+        key={`${selectedYear || "no-year"}-${safeCurrentPage}`}
         items={items}
         loading={loadingData}
         hasAnyYear={availableYears.length > 0}
+        startNumber={startNumber}
       />
+
+      {/* Pagination: pakai meta dari backend */}
+      {meta && meta.total > 0 && (
+        <div className="px-4 pb-6 sm:px-6">
+          <div className="mt-1 flex items-center justify-between">
+            {/* kiri */}
+            <span className="text-xs text-zinc-600">
+              Halaman <span className="font-semibold">{safeCurrentPage}</span>{" "}
+              dari <span className="font-semibold">{totalPages}</span>
+            </span>
+
+            {/* kanan */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={safeCurrentPage <= 1 || loadingData}
+                onClick={() => {
+                  if (!loadingData) setCurrentPage(safeCurrentPage - 1);
+                }}
+              >
+                Prev
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={safeCurrentPage >= totalPages || loadingData}
+                onClick={() => {
+                  if (!loadingData) setCurrentPage(safeCurrentPage + 1);
+                }}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

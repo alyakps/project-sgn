@@ -42,13 +42,21 @@ type HardCompetencyApiItem = {
   deskripsi: string | null;
 };
 
+type ApiMeta = {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+};
+
 type HardCompetencyApiResponse = {
   data?: HardCompetencyApiItem[];
-  meta?: {
-    current_page: number;
-    per_page: number;
-    total: number;
-    last_page: number;
+  meta?: ApiMeta;
+  links?: {
+    first?: string | null;
+    prev?: string | null;
+    next?: string | null;
+    last?: string | null;
   };
 };
 
@@ -86,7 +94,6 @@ export default function AdminHardEmployeePage() {
   const router = useRouter();
   const params = useParams<{ employeeId: string }>();
 
-  // handle kasus string[] juga (safety)
   const employeeNik = React.useMemo(() => {
     const raw = params?.employeeId;
     if (!raw) return "";
@@ -99,6 +106,10 @@ export default function AdminHardEmployeePage() {
 
   const [yearOptions, setYearOptions] = React.useState<number[]>([]);
   const [selectedYear, setSelectedYear] = React.useState<number | null>(null);
+
+  // pagination
+  const [meta, setMeta] = React.useState<ApiMeta | null>(null);
+  const [currentPage, setCurrentPage] = React.useState<number>(1);
 
   const [loadingAuth, setLoadingAuth] = React.useState(true);
   const [loadingData, setLoadingData] = React.useState(false);
@@ -115,7 +126,6 @@ export default function AdminHardEmployeePage() {
       return;
     }
 
-    // kalau mau strict admin
     if (user.role && user.role !== "admin") {
       router.push("/");
       return;
@@ -124,10 +134,9 @@ export default function AdminHardEmployeePage() {
     setLoadingAuth(false);
   }, [router]);
 
-  /* ========== LOAD DATA DARI API ADMIN ========== */
-
+  /* ========== LOAD DATA DARI API ADMIN (dengan pagination) ========== */
   const loadData = React.useCallback(
-    async (nik: string, year?: number) => {
+    async (nik: string, year?: number, page: number = 1) => {
       const token = getToken();
 
       if (!token) {
@@ -142,10 +151,8 @@ export default function AdminHardEmployeePage() {
       setError(null);
 
       try {
-        let url = `${API_BASE_URL}/admin/karyawan/${nik}/hard-competencies`;
-        if (year) {
-          url += `?tahun=${year}`;
-        }
+        let url = `${API_BASE_URL}/admin/karyawan/${nik}/hard-competencies?page=${page}`;
+        if (typeof year === "number") url += `&tahun=${year}`;
 
         const res = await fetch(url, {
           method: "GET",
@@ -155,12 +162,22 @@ export default function AdminHardEmployeePage() {
           },
         });
 
+        if (res.status === 401) {
+          clearAuth();
+          router.push("/login");
+          return;
+        }
+
         if (!res.ok) {
           throw new Error(`Gagal memuat data (status ${res.status})`);
         }
 
         const json: HardCompetencyApiResponse = await res.json();
         const itemsRaw: HardCompetencyApiItem[] = json.data ?? [];
+
+        // pagination meta
+        setMeta(json.meta ?? null);
+        setCurrentPage(json.meta?.current_page ?? page);
 
         // kumpulkan daftar tahun dari data
         const years = Array.from(
@@ -169,15 +186,16 @@ export default function AdminHardEmployeePage() {
               .map((i) => i.tahun)
               .filter((v) => typeof v === "number" && !Number.isNaN(v))
           )
-        ).sort((a, b) => b - a); // terbaru dulu
+        ).sort((a, b) => b - a);
 
-        setYearOptions(years);
+        if (years.length > 0) setYearOptions(years);
 
         // tentukan tahun aktif
-        let activeYear: number | null = year ?? null;
-        if (!activeYear && years.length > 0) {
+        let activeYear: number | null =
+          typeof year === "number" ? year : selectedYear;
+
+        if (activeYear === null && years.length > 0) {
           activeYear = years[0];
-          // hanya set default kalau selectedYear sebelumnya belum di-set
           setSelectedYear((prev) => (prev === null ? years[0] : prev));
         }
 
@@ -203,32 +221,34 @@ export default function AdminHardEmployeePage() {
             subJob: item.sub_job_family_kompetensi ?? "-",
             status: (item.status ?? "").toLowerCase(),
             nilai: Number.isNaN(nilaiSafe as number) ? null : nilaiSafe,
-            deskripsi:
-              item.deskripsi ??
-              "Belum ada deskripsi kompetensi.",
+            deskripsi: item.deskripsi ?? "Belum ada deskripsi kompetensi.",
           };
         });
 
         setRows(mapped);
         setOpenSet(new Set());
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
-        setError(err?.message || "Gagal memuat data Hard Competency.");
+        const msg =
+          err instanceof Error ? err.message : "Gagal memuat data Hard Competency.";
+        setError(msg);
         setRows([]);
         setOpenSet(new Set());
+        setMeta(null);
       } finally {
         setLoadingData(false);
       }
     },
-    [router]
+    [router, selectedYear]
   );
 
-  // pertama kali: setelah auth OK dan nik ada → load tanpa tahun spesifik
+  // pertama kali: setelah auth OK dan nik ada → load page 1
   React.useEffect(() => {
     if (!loadingAuth && employeeNik) {
-      loadData(employeeNik);
+      loadData(employeeNik, selectedYear ?? undefined, 1);
     }
-  }, [loadingAuth, employeeNik, loadData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingAuth, employeeNik]);
 
   const toggleRow = (idKey: string) =>
     setOpenSet((prev) => {
@@ -247,6 +267,11 @@ export default function AdminHardEmployeePage() {
 
   const effectiveYearOptions = yearOptions.length > 0 ? yearOptions : [];
 
+  // pagination safe values
+  const safeCurrentPage = meta?.current_page ?? currentPage;
+  const totalPages = meta?.last_page ?? 1;
+  const perPage = meta?.per_page ?? rows.length;
+
   return (
     <section className="flex flex-col gap-3 overflow-visible">
       {/* Header: panah kembali (kiri) + title, filter tahun di kanan */}
@@ -261,24 +286,20 @@ export default function AdminHardEmployeePage() {
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h2 className="text-lg sm:text-xl font-semibold">
-            Hard Competency
-          </h2>
+          <h2 className="text-lg sm:text-xl font-semibold">Hard Competency</h2>
         </div>
 
         <div className="relative z-20">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-zinc-700">Tahun:</span>
             <Select
-              value={
-                selectedYear !== null ? String(selectedYear) : undefined
-              }
+              value={selectedYear !== null ? String(selectedYear) : undefined}
               onValueChange={(v) => {
                 const year = Number(v);
                 setSelectedYear(year);
                 if (employeeNik) {
-                  // reload data untuk tahun yang dipilih
-                  loadData(employeeNik, year);
+                  // reset page ke 1 saat ganti tahun
+                  loadData(employeeNik, year, 1);
                 }
               }}
               disabled={loadingData || effectiveYearOptions.length === 0}
@@ -313,15 +334,9 @@ export default function AdminHardEmployeePage() {
                 <tr className="text-zinc-700 border-b">
                   <th className="py-3 px-2 text-center w-[60px]">No</th>
                   <th className="py-3 px-2 text-left">Kompetensi</th>
-                  <th className="py-3 px-2 text-center w-[140px]">
-                    Status
-                  </th>
-                  <th className="py-3 px-2 text-center w-[90px]">
-                    Nilai
-                  </th>
-                  <th className="py-3 px-2 text-center w-[110px]">
-                    Detail
-                  </th>
+                  <th className="py-3 px-2 text-center w-[140px]">Status</th>
+                  <th className="py-3 px-2 text-center w-[90px]">Nilai</th>
+                  <th className="py-3 px-2 text-center w-[110px]">Detail</th>
                 </tr>
               </thead>
 
@@ -339,6 +354,8 @@ export default function AdminHardEmployeePage() {
 
                 {rows.map((r, i) => {
                   const open = openSet.has(r.idKey);
+                  const rowNumber = (safeCurrentPage - 1) * perPage + (i + 1);
+
                   return (
                     <React.Fragment key={r.idKey}>
                       {/* Row utama */}
@@ -348,7 +365,7 @@ export default function AdminHardEmployeePage() {
                         }`}
                       >
                         <td className="py-3 px-2 text-center whitespace-nowrap align-middle">
-                          {i + 1}
+                          {rowNumber}
                         </td>
 
                         <td className="py-3 px-2 align-middle">
@@ -388,9 +405,7 @@ export default function AdminHardEmployeePage() {
                               <div className="px-6 py-4 space-y-3">
                                 <div className="grid gap-3 sm:grid-cols-2">
                                   <div>
-                                    <p className="text-xs text-zinc-500">
-                                      ID
-                                    </p>
+                                    <p className="text-xs text-zinc-500">ID</p>
                                     <p className="text-[15px] font-semibold">
                                       {r.displayId}
                                     </p>
@@ -451,6 +466,53 @@ export default function AdminHardEmployeePage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination: pakai meta dari backend */}
+          {meta && meta.total > 0 && (
+            <div className="mt-4 flex items-center justify-between">
+              {/* kiri */}
+              <span className="text-xs text-zinc-600">
+                Halaman{" "}
+                <span className="font-semibold">{safeCurrentPage}</span> dari{" "}
+                <span className="font-semibold">{totalPages}</span>
+              </span>
+
+              {/* kanan */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safeCurrentPage <= 1 || loadingData}
+                  onClick={() =>
+                    !loadingData &&
+                    loadData(
+                      employeeNik,
+                      selectedYear ?? undefined,
+                      safeCurrentPage - 1
+                    )
+                  }
+                >
+                  Prev
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safeCurrentPage >= totalPages || loadingData}
+                  onClick={() =>
+                    !loadingData &&
+                    loadData(
+                      employeeNik,
+                      selectedYear ?? undefined,
+                      safeCurrentPage + 1
+                    )
+                  }
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>

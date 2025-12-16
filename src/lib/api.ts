@@ -438,3 +438,44 @@ export async function apiGetMasterUnitKerja(token: string): Promise<string[]> {
   const list = Array.isArray(json.data) ? json.data : [];
   return list as string[];
 }
+
+export async function fetchCompetencySummary(
+  token: string,
+  unitKerja: string,
+  years: number[]
+) {
+  const params = new URLSearchParams();
+
+  // ✅ "All" hanya konsep UI → jangan jadi filter backend
+  if (unitKerja !== "All") {
+    params.set("unit_kerja", unitKerja);
+  }
+
+  // ✅ kirim years[] hanya kalau user memang milih tahun
+  if (Array.isArray(years) && years.length > 0) {
+    years.forEach((y) => params.append("years[]", String(y)));
+  }
+
+  const qs = params.toString();
+  const url = qs
+    ? `${API_URL}/api/admin/dashboard/competency-summary?${qs}`
+    : `${API_URL}/api/admin/dashboard/competency-summary`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const json = await res.json().catch(() => ({} as any));
+
+  if (!res.ok) {
+    // kalau backend ngirim message/error
+    throw new Error(json.message || "Failed to fetch dashboard data");
+  }
+
+  // backend bisa kirim {data: ...} atau langsung ...
+  return json.data ?? json;
+}

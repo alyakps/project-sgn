@@ -13,6 +13,14 @@ export type ImportLog = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+function normalizeType(raw: unknown): ImportType {
+  const v = String(raw ?? "").toLowerCase();
+
+  // backend format: "soft_competency" | "hard_competency"
+  if (v.includes("soft")) return "soft";
+  return "hard";
+}
+
 export async function fetchImportLogs(): Promise<ImportLog[]> {
   const token = getToken();
   if (!API_URL) throw new Error("API URL belum di-set");
@@ -52,12 +60,10 @@ export async function fetchImportLogs(): Promise<ImportLog[]> {
           )} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`
         : createdAt || "-";
 
-    const t = (item.type ?? "").toLowerCase() as ImportType;
-
     return {
       id: item.id ?? index + 1,
       filename: item.filename ?? "-",
-      type: t === "soft" ? "soft" : "hard",
+      type: normalizeType(item.type), // ✅ FIX DI SINI
       uploadedAt,
       year: item.tahun ?? item.year ?? undefined,
     };
