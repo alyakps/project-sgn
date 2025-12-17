@@ -1,23 +1,31 @@
 // src/lib/api-import.ts
 import { getToken, clearAuth } from "@/lib/auth-storage";
 
+// ✅ ini khusus untuk aksi import kompetensi (dropdown hard/soft)
 export type ImportType = "hard" | "soft";
+
+// ✅ ini khusus untuk log (bisa hard/soft/karyawan)
+export type ImportLogType = "hard" | "soft" | "karyawan";
 
 export type ImportLog = {
   id: number;
   filename: string;
-  type: ImportType;
+  type: ImportLogType; // ✅ FIX: log bisa karyawan
   uploadedAt: string;
   year?: number;
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-function normalizeType(raw: unknown): ImportType {
+function normalizeType(raw: unknown): ImportLogType {
   const v = String(raw ?? "").toLowerCase();
 
-  // backend format: "soft_competency" | "hard_competency"
+  // backend format: "karyawan" | "soft_competency" | "hard_competency"
+  if (v.includes("karyawan")) return "karyawan";
   if (v.includes("soft")) return "soft";
+  if (v.includes("hard")) return "hard";
+
+  // fallback aman
   return "hard";
 }
 
@@ -47,7 +55,7 @@ export async function fetchImportLogs(): Promise<ImportLog[]> {
   // Asumsi response: { data: [ { id, filename, type, tahun, created_at } ] }
   const rawLogs = (json.data ?? json) as any[];
 
-  const pad = (v: number) => String(v).padStart(2, "0");
+  const pad = (n: number) => String(n).padStart(2, "0");
 
   return rawLogs.map((item, index) => {
     const createdAt = item.created_at ?? item.uploaded_at ?? "";
@@ -55,15 +63,15 @@ export async function fetchImportLogs(): Promise<ImportLog[]> {
 
     const uploadedAt =
       dt != null && !Number.isNaN(dt.getTime())
-        ? `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(
-            dt.getDate()
-          )} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`
+        ? `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(
+            dt.getHours()
+          )}:${pad(dt.getMinutes())}`
         : createdAt || "-";
 
     return {
       id: item.id ?? index + 1,
       filename: item.filename ?? "-",
-      type: normalizeType(item.type), // ✅ FIX DI SINI
+      type: normalizeType(item.type), // ✅ FIX UTAMA DI SINI
       uploadedAt,
       year: item.tahun ?? item.year ?? undefined,
     };
@@ -106,9 +114,7 @@ export async function importCompetencyFile(
 
   if (!res.ok) {
     const msg =
-      payload?.message ||
-      payload?.error ||
-      "Terjadi kesalahan saat import file";
+      payload?.message || payload?.error || "Terjadi kesalahan saat import file";
     throw new Error(msg);
   }
 

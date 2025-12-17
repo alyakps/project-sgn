@@ -186,7 +186,7 @@ export default function DataEntryPage() {
               {/* Jenis Kompetensi */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-zinc-800">
-                  Jenis Kompetensi
+                  Jenis File
                 </label>
 
                 <Select
@@ -352,8 +352,8 @@ export default function DataEntryPage() {
                       <th className="py-3 px-4 text-left text-sm font-semibold">
                         Nama File
                       </th>
-                      <th className="py-3 px-4 text-left text-sm font-semibold">
-                        Jenis Kompetensi
+                      <th className="py-3 px-4 text-center text-sm font-semibold">
+                        Jenis
                       </th>
                       <th className="py-3 px-4 text-left text-sm font-semibold">
                         Tahun
@@ -373,20 +373,27 @@ export default function DataEntryPage() {
                         <td className="py-3 px-4 align-middle text-gray-800">
                           {log.filename}
                         </td>
-                        <td className="py-3 px-4 align-middle">
+
+                        {/* ✅ FIX UI: header & isi kolom Jenis lurus (center) */}
+                        <td className="py-3 px-4 align-middle text-center">
                           <span
                             className={[
-                              "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium border",
+                              "inline-flex justify-center rounded-full px-2.5 py-0.5 text-[11px] font-medium border",
                               log.type === "hard"
                                 ? "bg-blue-50 text-blue-700 border-blue-100"
-                                : "bg-emerald-50 text-emerald-700 border-emerald-100",
+                                : log.type === "soft"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                                : "bg-zinc-100 text-zinc-700 border-zinc-200",
                             ].join(" ")}
                           >
                             {log.type === "hard"
                               ? "Hard Competency"
-                              : "Soft Competency"}
+                              : log.type === "soft"
+                              ? "Soft Competency"
+                              : "Karyawan"}
                           </span>
                         </td>
+
                         <td className="py-3 px-4 align-middle text-gray-700">
                           {log.year ?? "-"}
                         </td>
@@ -403,11 +410,8 @@ export default function DataEntryPage() {
                   <div className="mt-4 flex items-center justify-between">
                     <span className="text-xs text-zinc-600">
                       Halaman{" "}
-                      <span className="font-semibold">
-                        {safeCurrentPage}
-                      </span>{" "}
-                      dari{" "}
-                      <span className="font-semibold">{totalPages}</span>
+                      <span className="font-semibold">{safeCurrentPage}</span>{" "}
+                      dari <span className="font-semibold">{totalPages}</span>
                     </span>
 
                     <div className="flex items-center gap-2">
@@ -422,9 +426,7 @@ export default function DataEntryPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={
-                          safeCurrentPage >= totalPages || isLogsLoading
-                        }
+                        disabled={safeCurrentPage >= totalPages || isLogsLoading}
                         onClick={handleNextPage}
                       >
                         Next
