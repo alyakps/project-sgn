@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
+import Cookies from "js-cookie"; // ✅ tambah
 import {
   Tooltip,
   TooltipContent,
@@ -42,6 +43,26 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 type Role = "karyawan" | "admin";
 
+/* ✅ helper: lock UI kalau wajib ganti password */
+function useMustChangeLock() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const token = Cookies.get("sgn_token") || null;
+  const mustChange = Cookies.get("sgn_must_change_password") === "1";
+  const isPasswordPage = pathname === "/dashboard/password";
+
+  React.useEffect(() => {
+    if (token && mustChange && !isPasswordPage) {
+      router.replace("/dashboard/password");
+    }
+  }, [token, mustChange, isPasswordPage, router]);
+
+  return {
+    locked: !!token && mustChange && !isPasswordPage,
+  };
+}
+
 function DashboardShell({
   children,
   role: _role, // disiapkan untuk nanti (shared), sekarang belum dipakai
@@ -54,6 +75,8 @@ function DashboardShell({
   const isActive = (base: string) =>
     pathname === base || pathname.startsWith(base + "/");
 
+  const { locked } = useMustChangeLock(); // ✅ tambah
+
   return (
     <div className="h-screen w-full bg-zinc-50 flex flex-col overflow-hidden">
       <TooltipProvider delayDuration={100}>
@@ -61,71 +84,90 @@ function DashboardShell({
         <TopBarNoSSR />
 
         {/* === BODY: SIDEBAR + MAIN === */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* SIDEBAR */}
-          <aside
-            className={[
-              "h-full",
-              "w-14 md:w-56",
-              "border-r border-zinc-200 bg-white",
-              "p-2 md:p-3",
-              "flex flex-col",
-            ].join(" ")}
-          >
-            {/* Items */}
-            <div className="flex-1 flex flex-col gap-2 md:gap-2.5 overflow-hidden">
-              <SidebarItem
-                href="/dashboard"
-                label="Dashboard"
-                active={isActive("/dashboard") && pathname === "/dashboard"}
-                icon={<LayoutDashboard className="h-5 w-5" />}
-              />
+        <div className="flex flex-1 overflow-hidden relative">
+          {/* ✅ overlay & disable interaksi saat locked */}
+          {locked && (
+            <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-[2px]">
+              <div className="h-full w-full flex items-center justify-center p-4">
+                <div className="max-w-md w-full rounded-xl border border-zinc-200 bg-white p-5 shadow-sm text-center">
+                  <div className="text-base font-semibold text-zinc-900">
+                    Wajib ganti password
+                  </div>
+                  <div className="mt-1 text-sm text-zinc-600">
+                    Kamu harus mengganti password dulu sebelum mengakses halaman lain.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
-              <div className="hidden md:block text-[17px] font-semibold uppercase tracking-wide text-zinc-900 mt-1">
-                Overview
+          {/* ✅ wrapper: kalau locked, semua klik mati */}
+          <div className={locked ? "pointer-events-none opacity-60 flex flex-1 overflow-hidden" : "flex flex-1 overflow-hidden"}>
+            {/* SIDEBAR */}
+            <aside
+              className={[
+                "h-full",
+                "w-14 md:w-56",
+                "border-r border-zinc-200 bg-white",
+                "p-2 md:p-3",
+                "flex flex-col",
+              ].join(" ")}
+            >
+              {/* Items */}
+              <div className="flex-1 flex flex-col gap-2 md:gap-2.5 overflow-hidden">
+                <SidebarItem
+                  href="/dashboard"
+                  label="Dashboard"
+                  active={isActive("/dashboard") && pathname === "/dashboard"}
+                  icon={<LayoutDashboard className="h-5 w-5" />}
+                />
+
+                <div className="hidden md:block text-[17px] font-semibold uppercase tracking-wide text-zinc-900 mt-1">
+                  Overview
+                </div>
+
+                <SidebarItem
+                  href="/dashboard/hard"
+                  label="Hard Competency"
+                  active={isActive("/dashboard/hard")}
+                  icon={<BarChart className="h-5 w-5" />}
+                />
+                <SidebarItem
+                  href="/dashboard/soft"
+                  label="Soft Competency"
+                  active={isActive("/dashboard/soft")}
+                  icon={<LineChart className="h-5 w-5" />}
+                />
               </div>
 
-              <SidebarItem
-                href="/dashboard/hard"
-                label="Hard Competency"
-                active={isActive("/dashboard/hard")}
-                icon={<BarChart className="h-5 w-5" />}
-              />
-              <SidebarItem
-                href="/dashboard/soft"
-                label="Soft Competency"
-                active={isActive("/dashboard/soft")}
-                icon={<LineChart className="h-5 w-5" />}
-              />
-            </div>
+              {/* Footer */}
+              <div className="pt-3 md:pt-4 border-t border-zinc-200">
+                <div className="hidden md:block text-[17px] font-semibold uppercase tracking-wide text-zinc-900 mb-2">
+                  Settings
+                </div>
 
-            {/* Footer */}
-            <div className="pt-3 md:pt-4 border-t border-zinc-200">
-              <div className="hidden md:block text-[17px] font-semibold uppercase tracking-wide text-zinc-900 mb-2">
-                Settings
+                <SidebarItem
+                  href="/dashboard/profile"
+                  label="Profile"
+                  active={isActive("/dashboard/profile")}
+                  icon={<User className="h-5 w-5" />}
+                />
+
+                {/* ini cuma link ke "/" biasa, logout yang bener lewat top bar */}
+                <SidebarItem
+                  href="/"
+                  label="Logout"
+                  active={false}
+                  icon={<LogOut className="h-5 w-5" />}
+                />
               </div>
+            </aside>
 
-              <SidebarItem
-                href="/dashboard/profile"
-                label="Profile"
-                active={isActive("/dashboard/profile")}
-                icon={<User className="h-5 w-5" />}
-              />
-
-              {/* ini cuma link ke "/" biasa, logout yang bener lewat top bar */}
-              <SidebarItem
-                href="/"
-                label="Logout"
-                active={false}
-                icon={<LogOut className="h-5 w-5" />}
-              />
-            </div>
-          </aside>
-
-          {/* MAIN CONTENT */}
-          <main className="flex-1 h-full overflow-y-auto bg-white p-4 sm:p-6 md:p-8">
-            {children}
-          </main>
+            {/* MAIN CONTENT */}
+            <main className="flex-1 h-full overflow-y-auto bg-white p-4 sm:p-6 md:p-8">
+              {children}
+            </main>
+          </div>
         </div>
       </TooltipProvider>
     </div>

@@ -46,17 +46,24 @@ export default function SignInPage() {
         name: me.name,
         email: me.email,
         role: me.role,
+
+        // ✅ simpan flag
+        must_change_password: !!me.must_change_password,
       });
+
+      // ✅ kalau wajib ganti password → paksa ke halaman change password
+      if (me.must_change_password) {
+        router.replace("/dashboard/password");
+        return;
+      }
 
       // 4) Normalisasi role, jaga2 kalau dari API "Admin"/"ADMIN"
       const role = String(me.role).toLowerCase();
 
       if (role === "admin") {
-        // Admin → ke dashboard admin (route kamu sekarang)
         router.replace("/admin");
       } else {
-        // Karyawan → ke dashboard karyawan
-        router.replace("/dashboard"); // ganti "/" → "/dashboard" biar konsisten
+        router.replace("/dashboard");
       }
     } catch (err: any) {
       setError(err?.message || "Email atau password salah");
@@ -82,12 +89,8 @@ export default function SignInPage() {
 
         <CardContent className="px-5 pb-5">
           <form onSubmit={onSubmit} className="space-y-4">
-            {/* Email */}
             <div className="space-y-2">
-              <Label
-                htmlFor="email"
-                className="text-sm font-semibold text-zinc-800"
-              >
+              <Label htmlFor="email" className="text-sm font-semibold text-zinc-800">
                 Email
               </Label>
               <Input
@@ -102,12 +105,8 @@ export default function SignInPage() {
               />
             </div>
 
-            {/* Password */}
             <div className="space-y-2">
-              <Label
-                htmlFor="password"
-                className="text-sm font-semibold text-zinc-800"
-              >
+              <Label htmlFor="password" className="text-sm font-semibold text-zinc-800">
                 Password
               </Label>
               <div className="relative">
@@ -131,14 +130,12 @@ export default function SignInPage() {
               </div>
             </div>
 
-            {/* Error */}
             {error && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
                 {error}
               </p>
             )}
 
-            {/* Button */}
             <Button
               type="submit"
               disabled={loading}
