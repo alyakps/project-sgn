@@ -235,7 +235,8 @@ export async function apiAdminListKaryawan(
 ): Promise<{ items: AdminKaryawan[]; meta: AdminKaryawanMeta }> {
   const url = new URL(`${API_URL}/api/admin/karyawan`);
 
-  if (params?.per_page) url.searchParams.set("per_page", String(params.per_page));
+  if (params?.per_page)
+    url.searchParams.set("per_page", String(params.per_page));
   if (params?.page) url.searchParams.set("page", String(params.page));
   if (params?.q && params.q.trim() !== "") {
     url.searchParams.set("q", params.q.trim());
@@ -339,7 +340,7 @@ export async function apiAdminCreateKaryawan(
  */
 export async function apiAdminResetKaryawanPassword(
   token: string,
-  nik: string, // ✅ ubah dari number -> string
+  nik: string // ✅ ubah dari number -> string
 ) {
   const API_BASE_URL =
     (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000")
@@ -364,14 +365,17 @@ export async function apiAdminResetKaryawanPassword(
 
 /* ====================== ADMIN – DELETE KARYAWAN ====================== */
 
-export async function apiAdminDeleteKaryawan(token: string, userId: number) {
-  const res = await fetch(`${API_URL}/api/admin/karyawan/${userId}`, {
-    method: "DELETE",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
+export async function apiAdminDeleteKaryawan(token: string, nik: string) {
+  const res = await fetch(
+    `${API_URL}/api/admin/karyawan/${encodeURIComponent(nik)}`,
+    {
+      method: "DELETE",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 
   const json = await res.json().catch(() => ({} as any));
 

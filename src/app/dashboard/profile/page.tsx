@@ -1,3 +1,4 @@
+// app/dashboard/profile/page.tsx
 "use client";
 
 import * as React from "react";
@@ -73,6 +74,31 @@ const API_BASE_URL =
 
 const UPDATE_PROFILE_URL = `${API_BASE_URL}/karyawan/profile`;
 
+// =======================
+// Helpers
+// =======================
+function toNullIfEmpty(v: string | null | undefined): string | null {
+  if (v == null) return null;
+  const t = String(v).trim();
+  return t === "" || t === "-" ? null : t;
+}
+
+function parseLaravel422(json: any): { message?: string; fieldErrors?: Record<string, string> } {
+  // bentuk umum Laravel:
+  // { message: "...", errors: { field: ["msg"], ... } }
+  const fieldErrors: Record<string, string> = {};
+  if (json?.errors && typeof json.errors === "object") {
+    for (const key of Object.keys(json.errors)) {
+      const arr = json.errors[key];
+      if (Array.isArray(arr) && arr[0]) fieldErrors[key] = String(arr[0]);
+    }
+  }
+  return {
+    message: json?.message ? String(json.message) : undefined,
+    fieldErrors: Object.keys(fieldErrors).length ? fieldErrors : undefined,
+  };
+}
+
 // ======================================================================
 // PAGE
 // ======================================================================
@@ -96,9 +122,10 @@ export default function ProfilePage() {
     achievements: [],
   });
 
-  const [form, setForm] = React.useState<ProfileFormState>({
+  // ✅ default values untuk RHF di dialog
+  const [defaultForm, setDefaultForm] = React.useState<ProfileFormState>({
     jabatanTerakhir: "",
-    unitKerja: "", // tetap ada di state untuk display, tapi TIDAK dikirim ke backend
+    unitKerja: "",
     gelarAkademik: "",
     pendidikan: "",
     noKtp: "",
@@ -148,8 +175,6 @@ export default function ProfilePage() {
         const p = json.data.profile;
 
         const nama = p.nama_lengkap || user.name;
-
-        // ✅ FIX: source of truth unit kerja dari users.unit_kerja, fallback profile.unit_kerja
         const unitKerja = user.unit_kerja ?? p.unit_kerja ?? "";
 
         // MAIN STATE
@@ -165,8 +190,8 @@ export default function ProfilePage() {
         };
         setMain(mainState);
 
-        // FORM STATE (unitKerja hanya untuk display, tidak akan dikirim)
-        setForm({
+        // ✅ Default form values untuk RHF dialog
+        setDefaultForm({
           jabatanTerakhir: p.jabatan_terakhir ?? "",
           unitKerja: unitKerja ?? "",
           gelarAkademik: p.gelar_akademik ?? "",
@@ -182,7 +207,7 @@ export default function ProfilePage() {
           golonganDarah: p.golongan_darah ?? "",
           statusPerkawinan: p.status_perkawinan ?? "",
           handphone: p.handphone ?? "",
-          emailPribadi: p.email_pribadi ?? user.email,
+          emailPribadi: p.email_pribadi ?? user.email ?? "",
           penilaianKerja: p.penilaian_kerja ?? "",
           pencapaian: p.pencapaian ?? "",
         });
@@ -225,37 +250,39 @@ export default function ProfilePage() {
   }, []);
 
   // ======================================================================
-  // HANDLE SAVE
+  // SAVE (dipanggil dari Dialog)
   // ======================================================================
-  async function handleSave() {
-    try {
-      setSaving(true);
-      setError(null);
+  async function handleSave(values: ProfileFormState) {
+    setSaving(true);
+    setError(null);
 
+    try {
       const token = getToken();
 
+      // ✅ Map RHF values -> payload backend (snake_case)
+      // Mandatory fields jangan di-null-kan
       const payload = {
-        jabatan_terakhir: emptyToNull(form.jabatanTerakhir),
-        // ❌ unit_kerja sengaja TIDAK dikirim
-        gelar_akademik: emptyToNull(form.gelarAkademik),
-        pendidikan: emptyToNull(form.pendidikan),
-        no_ktp: emptyToNull(form.noKtp),
-        tempat_lahir: emptyToNull(form.tempatLahir),
-        tanggal_lahir: emptyToNull(form.tanggalLahir),
-        jenis_kelamin: emptyToNull(form.jenisKelamin),
-        agama: emptyToNull(form.agama),
-        alamat_rumah: emptyToNull(form.alamatRumah),
-        npwp: emptyToNull(form.npwp),
-        suku: emptyToNull(form.suku),
-        golongan_darah: emptyToNull(form.golonganDarah),
-        status_perkawinan: emptyToNull(form.statusPerkawinan),
-        handphone: emptyToNull(form.handphone),
-        penilaian_kerja: emptyToNull(form.penilaianKerja),
-        pencapaian: emptyToNull(form.pencapaian),
+        jabatan_terakhir: toNullIfEmpty(values.jabatanTerakhir),
+        gelar_akademik: toNullIfEmpty(values.gelarAkademik),
+        pendidikan: toNullIfEmpty(values.pendidikan),
+        no_ktp: values.noKtp.trim(),
+        tempat_lahir: toNullIfEmpty(values.tempatLahir),
+        tanggal_lahir: values.tanggalLahir.trim(), // "yyyy-MM-dd"
+        jenis_kelamin: toNullIfEmpty(values.jenisKelamin),
+        agama: toNullIfEmpty(values.agama),
+        alamat_rumah: values.alamatRumah.trim(),
+        npwp: toNullIfEmpty(values.npwp),
+        suku: toNullIfEmpty(values.suku),
+        golongan_darah: toNullIfEmpty(values.golonganDarah),
+        status_perkawinan: values.statusPerkawinan.trim(),
+        handphone: values.handphone.trim(),
+        email_pribadi: toNullIfEmpty(values.emailPribadi),
+        penilaian_kerja: toNullIfEmpty(values.penilaianKerja),
+        pencapaian: toNullIfEmpty(values.pencapaian),
       };
 
       const res = await fetch(UPDATE_PROFILE_URL, {
-        method: "POST", // route kamu pakai POST
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
@@ -264,41 +291,59 @@ export default function ProfilePage() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Gagal menyimpan profil.");
+      const json = await res.json().catch(() => ({} as any));
 
-      // update view singkat setelah save (unitKerja TIDAK berubah di sini)
+      if (!res.ok) {
+        if (res.status === 422) {
+          const parsed = parseLaravel422(json);
+          // throw object supaya dialog bisa set per-field error
+          throw {
+            kind: "validation",
+            message:
+              parsed.message ||
+              "Validasi gagal. Mohon periksa field yang wajib diisi.",
+            fieldErrors: parsed.fieldErrors,
+          };
+        }
+
+        throw new Error(json?.message || "Gagal menyimpan profil.");
+      }
+
+      // ✅ Update UI setelah save (pakai values)
       setMain((prev) => ({
         ...prev,
-        jabatanTerakhir: fix(form.jabatanTerakhir),
-        handphone: fix(form.handphone),
+        jabatanTerakhir: fix(values.jabatanTerakhir),
+        handphone: fix(values.handphone),
+        email: fix(values.emailPribadi || prev.email),
       }));
 
       setPersonal([
-        { label: "Gelar Akademik", value: fix(form.gelarAkademik) },
-        { label: "Pendidikan", value: fix(form.pendidikan) },
-        { label: "No. KTP", value: fix(form.noKtp) },
-        { label: "Tempat Lahir", value: fix(form.tempatLahir) },
-        { label: "Tanggal Lahir", value: fix(form.tanggalLahir) },
-        { label: "Jenis Kelamin", value: fix(form.jenisKelamin) },
-        { label: "Agama", value: fix(form.agama) },
-        { label: "Alamat Rumah", value: fix(form.alamatRumah) },
-        { label: "NPWP", value: fix(form.npwp) },
-        { label: "Suku", value: fix(form.suku) },
-        { label: "Golongan Darah", value: fix(form.golonganDarah) },
-        { label: "Status Perkawinan", value: fix(form.statusPerkawinan) },
+        { label: "Gelar Akademik", value: fix(values.gelarAkademik) },
+        { label: "Pendidikan", value: fix(values.pendidikan) },
+        { label: "No. KTP", value: fix(values.noKtp) },
+        { label: "Tempat Lahir", value: fix(values.tempatLahir) },
+        { label: "Tanggal Lahir", value: fix(values.tanggalLahir) },
+        { label: "Jenis Kelamin", value: fix(values.jenisKelamin) },
+        { label: "Agama", value: fix(values.agama) },
+        { label: "Alamat Rumah", value: fix(values.alamatRumah) },
+        { label: "NPWP", value: fix(values.npwp) },
+        { label: "Suku", value: fix(values.suku) },
+        { label: "Golongan Darah", value: fix(values.golonganDarah) },
+        { label: "Status Perkawinan", value: fix(values.statusPerkawinan) },
       ]);
 
       setPerformance({
-        penilaianKerja: [fix(form.penilaianKerja || "-")],
-        achievements: [fix(form.pencapaian || "-")],
+        penilaianKerja: [fix(values.penilaianKerja || "-")],
+        achievements: [fix(values.pencapaian || "-")],
       });
 
-      // biar mini profile / topbar ikut update
+      // sync topbar / mini profile
       queryClient.invalidateQueries({ queryKey: ["profile", "me"] });
 
+      // ✅ update default values untuk edit selanjutnya
+      setDefaultForm(values);
+
       setIsEditing(false);
-    } catch (err: any) {
-      setError(err.message ?? "Gagal menyimpan profil.");
     } finally {
       setSaving(false);
     }
@@ -309,7 +354,6 @@ export default function ProfilePage() {
   // ======================================================================
   return (
     <div className="flex flex-col gap-3">
-      {/* HEADER TITLE */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg sm:text-xl font-semibold">Profile</h2>
       </div>
@@ -321,22 +365,15 @@ export default function ProfilePage() {
       )}
       {error && <p className="text-xs sm:text-sm text-red-600">{error}</p>}
 
-      {/* HEADER CARD */}
       <ProfileHeaderCard main={main} onEdit={() => setIsEditing(true)} />
-
-      {/* PERSONAL INFO */}
       <ProfilePersonalCard items={personal} />
-
-      {/* WORK PERFORMANCE */}
       <ProfilePerformanceCard performance={performance} />
 
-      {/* POPUP EDIT FORM */}
       <ProfileEditDialog
         open={isEditing}
         onOpenChange={setIsEditing}
         main={main}
-        form={form}
-        setForm={setForm}
+        defaultValues={defaultForm}
         saving={saving}
         onSubmit={handleSave}
       />

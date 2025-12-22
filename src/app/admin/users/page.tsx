@@ -19,6 +19,7 @@ import {
   apiAdminListKaryawan,
   apiAdminResetKaryawanPassword,
   apiAdminImportKaryawan,
+  apiAdminDeleteKaryawan, // ✅ FIX: pakai helper delete by NIK
 } from "@/lib/api";
 
 import {
@@ -139,6 +140,9 @@ const AdminUsersPage: React.FC = () => {
     }
   };
 
+  // =========================
+  // ✅ DELETE USER (FIX: pakai helper api + NIK)
+  // =========================
   const doDeleteUser = async (user: UserRow) => {
     try {
       setDeletingUserId(user.id);
@@ -146,22 +150,8 @@ const AdminUsersPage: React.FC = () => {
       const token = getToken();
       if (!token) throw new Error("Token tidak ditemukan. Silakan login ulang.");
 
-      const API_BASE_URL =
-        (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000").replace(
-          /\/$/,
-          "",
-        ) + "/api";
-
-      const res = await fetch(`${API_BASE_URL}/admin/karyawan/${user.id}`, {
-        method: "DELETE",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const json = await res.json().catch(() => ({} as any));
-      if (!res.ok) throw new Error(json.message || "Gagal menghapus user.");
+      // ✅ FIX: gunakan helper -> endpoint delete by NIK
+      await apiAdminDeleteKaryawan(token, user.nik);
 
       await loadUsers(safeCurrentPage);
     } catch (err: any) {
@@ -322,7 +312,10 @@ const AdminUsersPage: React.FC = () => {
           <tbody>
             {loadingData && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
+                <td
+                  colSpan={4}
+                  className="px-4 py-6 text-center text-sm text-gray-500"
+                >
                   Memuat data user...
                 </td>
               </tr>
@@ -330,7 +323,10 @@ const AdminUsersPage: React.FC = () => {
 
             {!loadingData && users.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
+                <td
+                  colSpan={4}
+                  className="px-4 py-6 text-center text-sm text-gray-500"
+                >
                   Tidak ada data user.
                 </td>
               </tr>
@@ -341,7 +337,10 @@ const AdminUsersPage: React.FC = () => {
                 const rowLoading = isAnyRowLoading(user.id);
 
                 return (
-                  <tr key={user.id} className="transition-colors hover:bg-gray-50">
+                  <tr
+                    key={user.id}
+                    className="transition-colors hover:bg-gray-50"
+                  >
                     <td className="px-4 py-2 align-middle">{user.nik}</td>
                     <td className="px-4 py-2 align-middle">{user.name}</td>
                     <td className="px-4 py-2 align-middle">{user.email}</td>
@@ -362,7 +361,9 @@ const AdminUsersPage: React.FC = () => {
                           variant="outline"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => router.push(`/admin/users/${user.nik}/edit`)}
+                          onClick={() =>
+                            router.push(`/admin/users/${user.nik}/edit`)
+                          }
                           disabled={rowLoading}
                         >
                           <Pencil className="h-4 w-4" />
@@ -415,12 +416,16 @@ const AdminUsersPage: React.FC = () => {
       )}
 
       {/* Dialog Reset Password */}
-      <Dialog open={!!resetDialogUser} onOpenChange={(open) => !open && setResetDialogUser(null)}>
+      <Dialog
+        open={!!resetDialogUser}
+        onOpenChange={(open) => !open && setResetDialogUser(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reset Password</DialogTitle>
             <DialogDescription>
-              Password user akan direset ke default <b>123</b>. Pastikan Anda sudah menginformasikan kepada yang bersangkutan.
+              Password user akan direset ke default <b>123</b>. Pastikan Anda
+              sudah menginformasikan kepada yang bersangkutan.
             </DialogDescription>
           </DialogHeader>
 
@@ -440,28 +445,43 @@ const AdminUsersPage: React.FC = () => {
               variant="outline"
               size="sm"
               onClick={() => setResetDialogUser(null)}
-              disabled={resetDialogUser ? loadingResetUserId === resetDialogUser.id : false}
+              disabled={
+                resetDialogUser
+                  ? loadingResetUserId === resetDialogUser.id
+                  : false
+              }
             >
               Batal
             </Button>
             <Button
               size="sm"
               onClick={() => resetDialogUser && doResetPassword(resetDialogUser)}
-              disabled={resetDialogUser ? loadingResetUserId === resetDialogUser.id : false}
+              disabled={
+                resetDialogUser
+                  ? loadingResetUserId === resetDialogUser.id
+                  : false
+              }
             >
-              {resetDialogUser && loadingResetUserId === resetDialogUser.id ? "Mereset..." : "Reset Password"}
+              {resetDialogUser && loadingResetUserId === resetDialogUser.id
+                ? "Mereset..."
+                : "Reset Password"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Dialog Delete User */}
-      <Dialog open={!!deleteDialogUser} onOpenChange={(open) => !open && setDeleteDialogUser(null)}>
+      <Dialog
+        open={!!deleteDialogUser}
+        onOpenChange={(open) => !open && setDeleteDialogUser(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Hapus User</DialogTitle>
             <DialogDescription>
-              Tindakan ini akan menghapus user dari sistem. Data kompetensi dan profil yang terhubung mungkin ikut terdampak sesuai pengaturan backend. Pastikan Anda yakin sebelum melanjutkan.
+              Tindakan ini akan menghapus user dari sistem. Data kompetensi dan
+              profil yang terhubung mungkin ikut terdampak sesuai pengaturan
+              backend. Pastikan Anda yakin sebelum melanjutkan.
             </DialogDescription>
           </DialogHeader>
 
@@ -482,7 +502,9 @@ const AdminUsersPage: React.FC = () => {
               variant="outline"
               size="sm"
               onClick={() => setDeleteDialogUser(null)}
-              disabled={deleteDialogUser ? deletingUserId === deleteDialogUser.id : false}
+              disabled={
+                deleteDialogUser ? deletingUserId === deleteDialogUser.id : false
+              }
             >
               Batal
             </Button>
@@ -490,9 +512,13 @@ const AdminUsersPage: React.FC = () => {
               size="sm"
               variant="destructive"
               onClick={() => deleteDialogUser && doDeleteUser(deleteDialogUser)}
-              disabled={deleteDialogUser ? deletingUserId === deleteDialogUser.id : false}
+              disabled={
+                deleteDialogUser ? deletingUserId === deleteDialogUser.id : false
+              }
             >
-              {deleteDialogUser && deletingUserId === deleteDialogUser.id ? "Menghapus..." : "Hapus"}
+              {deleteDialogUser && deletingUserId === deleteDialogUser.id
+                ? "Menghapus..."
+                : "Hapus"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -507,12 +533,16 @@ const AdminUsersPage: React.FC = () => {
               <span>Import User</span>
             </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm text-zinc-500 mt-1">
-              Upload file Excel berisi daftar karyawan. Pastikan format kolom sesuai template.
+              Upload file Excel berisi daftar karyawan. Pastikan format kolom
+              sesuai template.
             </DialogDescription>
           </DialogHeader>
 
           <div className="w-full px-1">
-            <form onSubmit={handleImportSubmit} className="space-y-3 sm:space-y-4 w-full max-w-md mx-auto">
+            <form
+              onSubmit={handleImportSubmit}
+              className="space-y-3 sm:space-y-4 w-full max-w-md mx-auto"
+            >
               <div className="space-y-1.5">
                 <div
                   className="flex flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-zinc-300 bg-zinc-50 px-4 py-4 text-center"
@@ -535,7 +565,10 @@ const AdminUsersPage: React.FC = () => {
 
                   {file && (
                     <p className="mt-1 text-xs text-zinc-600">
-                      Selected: <span className="font-medium text-zinc-800">{file.name}</span>
+                      Selected:{" "}
+                      <span className="font-medium text-zinc-800">
+                        {file.name}
+                      </span>
                     </p>
                   )}
                 </div>
@@ -546,7 +579,9 @@ const AdminUsersPage: React.FC = () => {
                   type="file"
                   accept=".xls,.xlsx"
                   className="hidden"
-                  onChange={(e) => validateAndSetFile(e.target.files?.[0] ?? undefined)}
+                  onChange={(e) =>
+                    validateAndSetFile(e.target.files?.[0] ?? undefined)
+                  }
                 />
 
                 <p className="text-xs text-zinc-500 text-center">
@@ -554,7 +589,9 @@ const AdminUsersPage: React.FC = () => {
                 </p>
 
                 {statusMessage && (
-                  <p className="text-xs text-red-600 text-center">{statusMessage}</p>
+                  <p className="text-xs text-red-600 text-center">
+                    {statusMessage}
+                  </p>
                 )}
               </div>
 
