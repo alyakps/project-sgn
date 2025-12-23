@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 import { apiLogin, apiMe } from "@/lib/api";
-import { saveAuth } from "@/lib/auth-storage";
+import { saveAuth, clearAuth } from "@/lib/auth-storage";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -36,36 +36,42 @@ export default function SignInPage() {
       const loginRes = await apiLogin(email, password);
       const token = loginRes.token;
 
-      // 2) Ambil data user
+      // 2) Ambil data user terbaru dari BE
       const me = await apiMe(token);
 
-      // 3) Simpan auth ke localStorage
+      // 3) Normalisasi role dulu (PENTING)
+      const role = String(me.role).toLowerCase() as "admin" | "karyawan" | string;
+
+      // 4) Simpan auth
       saveAuth(token, {
         id: me.id,
         nik: me.nik ?? null,
         name: me.name,
         email: me.email,
-        role: me.role,
+        role: role,
 
-        // ✅ simpan flag
         must_change_password: !!me.must_change_password,
       });
 
-      // ✅ kalau wajib ganti password → paksa ke halaman change password
-      if (me.must_change_password) {
+      /**
+       * ✅ RULE WAJIB:
+       * Lock (must_change_password) hanya berlaku untuk KARYAWAN.
+       * Admin tidak boleh ikut ke-lock dan tidak boleh diarahkan ke /dashboard/password.
+       */
+      if (role !== "admin" && me.must_change_password) {
         router.replace("/dashboard/password");
         return;
       }
 
-      // 4) Normalisasi role, jaga2 kalau dari API "Admin"/"ADMIN"
-      const role = String(me.role).toLowerCase();
-
+      // 5) Redirect sesuai role
       if (role === "admin") {
         router.replace("/admin");
       } else {
         router.replace("/dashboard");
       }
     } catch (err: any) {
+      // kalau ada kondisi token tersimpan sebagian, bersihin biar gak “ketukar”
+      clearAuth();
       setError(err?.message || "Email atau password salah");
     } finally {
       setLoading(false);
