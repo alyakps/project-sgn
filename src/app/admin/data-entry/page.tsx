@@ -22,10 +22,23 @@ import {
 } from "@/components/ui/dialog";
 
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+import {
   fetchImportLogs,
   importCompetencyFile,
+  cancelImportLog,
   type ImportLog,
   type ImportType,
+  type ImportLogType,
 } from "@/lib/api-import";
 
 /** ===== CONSTANTS ===== */
@@ -39,6 +52,10 @@ export default function DataEntryPage() {
   const [year, setYear] = useState<number>(2024);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  // cancel confirm state
+  const [cancelTarget, setCancelTarget] = useState<ImportLog | null>(null);
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const queryClient = useQueryClient();
@@ -66,7 +83,6 @@ export default function DataEntryPage() {
 
   const logs = logsData ?? [];
 
-  // reset halaman kalau jumlah data berubah
   React.useEffect(() => {
     setCurrentPage(1);
   }, [logs.length]);
@@ -90,18 +106,30 @@ export default function DataEntryPage() {
       queryClient.invalidateQueries({ queryKey: ["import-logs"] });
 
       setFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
 
       setIsImportModalOpen(false);
     },
     onError: (err: unknown) => {
-      if (err instanceof Error) {
-        setStatusMessage(err.message);
-      } else {
-        setStatusMessage("Gagal mengimport file.");
-      }
+      if (err instanceof Error) setStatusMessage(err.message);
+      else setStatusMessage("Gagal mengimport file.");
+    },
+  });
+
+  /* ==================== MUTATION CANCEL ==================== */
+
+  const cancelMutation = useMutation({
+    mutationFn: async (logId: number) => cancelImportLog(logId),
+    onSuccess: () => {
+      setIsCancelOpen(false);
+      setCancelTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["import-logs"] });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Gagal membatalkan import.";
+      setStatusMessage(msg);
+      setIsCancelOpen(false);
+      setCancelTarget(null);
     },
   });
 
@@ -112,10 +140,7 @@ export default function DataEntryPage() {
 
     if (f.size > MAX_FILE_SIZE) {
       setStatusMessage(`Ukuran file maksimal ${MAX_FILE_SIZE_MB}MB.`);
-      // reset input kalau lewat batas
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
       setFile(null);
       return;
     }
@@ -148,24 +173,68 @@ export default function DataEntryPage() {
     fileInputRef.current?.click();
   };
 
-  const handlePrevPage = () => {
-    setCurrentPage((prev) => Math.max(1, prev - 1));
+  const handlePrevPage = () => setCurrentPage((prev) => Math.max(1, prev - 1));
+  const handleNextPage = () =>
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+
+  const openCancelConfirm = (log: ImportLog) => {
+    setCancelTarget(log);
+    setIsCancelOpen(true);
   };
 
-  const handleNextPage = () => {
-    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+  // ✅ STEP 4: type sekarang hanya "hard" | "soft" | "karyawan"
+  const typeLabel = (t: ImportLogType) => {
+    if (t === "hard") return "Hard Competency";
+    if (t === "soft") return "Soft Competency";
+    if (t === "karyawan") return "Karyawan";
+    return t;
   };
 
   /* ==================== RENDER ==================== */
 
   return (
     <div className="space-y-6">
-      {/* Header halaman (tanpa tombol import) */}
+      {/* Header halaman */}
       <div>
         <h1 className="text-xl font-semibold text-zinc-900">
           Import Nilai Kompetensi
         </h1>
       </div>
+
+      {/* Confirm Cancel Dialog */}
+      <AlertDialog open={isCancelOpen} onOpenChange={setIsCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Batalkan Import?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Import ini akan <b>dinonaktifkan</b> sehingga data hasil import tidak
+              tampil/terpakai lagi. Tindakan ini hanya berlaku untuk data yang
+              bertanda <b>import_log_id</b> tersebut.
+              <br />
+              <br />
+              File: <b>{cancelTarget?.filename ?? "-"}</b>
+              <br />
+              Jenis:{" "}
+              <b>{cancelTarget ? typeLabel(cancelTarget.type) : "-"}</b>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelMutation.isPending}>
+              Batal
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!cancelTarget) return;
+                cancelMutation.mutate(cancelTarget.id);
+              }}
+              disabled={!cancelTarget || cancelMutation.isPending}
+            >
+              {cancelMutation.isPending ? "Memproses..." : "Ya, Batalkan Import"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modal Import */}
       <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
@@ -177,13 +246,11 @@ export default function DataEntryPage() {
             </DialogTitleBase>
           </DialogHeaderBase>
 
-          {/* Container form sederhana, tanpa card/border, pusat */}
           <div className="w-full px-1">
             <form
               onSubmit={handleSubmit}
               className="space-y-3 sm:space-y-4 w-full max-w-md mx-auto"
             >
-              {/* Jenis Kompetensi */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-zinc-800">
                   Jenis File
@@ -204,11 +271,8 @@ export default function DataEntryPage() {
                 </Select>
               </div>
 
-              {/* Tahun */}
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-zinc-800">
-                  Tahun
-                </label>
+                <label className="text-sm font-medium text-zinc-800">Tahun</label>
 
                 <Select
                   value={String(year)}
@@ -228,7 +292,6 @@ export default function DataEntryPage() {
                 </Select>
               </div>
 
-              {/* Dropzone */}
               <div className="space-y-1.5">
                 <div
                   className="flex flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-zinc-300 bg-zinc-50 px-4 py-4 text-center"
@@ -252,14 +315,11 @@ export default function DataEntryPage() {
                   {file && (
                     <p className="mt-1 text-xs text-zinc-600">
                       Selected:{" "}
-                      <span className="font-medium text-zinc-800">
-                        {file.name}
-                      </span>
+                      <span className="font-medium text-zinc-800">{file.name}</span>
                     </p>
                   )}
                 </div>
 
-                {/* Hidden file input */}
                 <input
                   ref={fileInputRef}
                   id="excel-file-input"
@@ -280,7 +340,6 @@ export default function DataEntryPage() {
                 )}
               </div>
 
-              {/* Save */}
               <div className="pt-1 flex justify-center">
                 <Button
                   type="submit"
@@ -305,7 +364,7 @@ export default function DataEntryPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Log Import + tombol Import sejajar */}
+      {/* Log Import + tombol Import */}
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -328,7 +387,6 @@ export default function DataEntryPage() {
           </Button>
         </div>
 
-        {/* Tabel log + pagination bentuk seperti screenshot */}
         <div className="p-0 sm:p-1">
           <div className="w-full overflow-x-auto">
             {isLogsLoading ? (
@@ -361,57 +419,86 @@ export default function DataEntryPage() {
                       <th className="py-3 px-4 text-left text-sm font-semibold">
                         Uploaded At
                       </th>
+                      <th className="py-3 px-4 text-center text-sm font-semibold">
+                        Status
+                      </th>
+                      <th className="py-3 px-4 text-center text-sm font-semibold">
+                        Aksi
+                      </th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {pagedLogs.map((log) => (
-                      <tr
-                        key={log.id}
-                        className="border-b border-gray-200 bg-white"
-                      >
-                        <td className="py-3 px-4 align-middle text-gray-800">
-                          {log.filename}
-                        </td>
+                    {pagedLogs.map((log) => {
+                      const isCanceled = log.status === "canceled";
+                      const canCancel = !isCanceled;
 
-                        {/* ✅ FIX UI: header & isi kolom Jenis lurus (center) */}
-                        <td className="py-3 px-4 align-middle text-center">
-                          <span
-                            className={[
-                              "inline-flex justify-center rounded-full px-2.5 py-0.5 text-[11px] font-medium border",
-                              log.type === "hard"
-                                ? "bg-blue-50 text-blue-700 border-blue-100"
-                                : log.type === "soft"
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                                : "bg-zinc-100 text-zinc-700 border-zinc-200",
-                            ].join(" ")}
-                          >
-                            {log.type === "hard"
-                              ? "Hard Competency"
-                              : log.type === "soft"
-                              ? "Soft Competency"
-                              : "Karyawan"}
-                          </span>
-                        </td>
+                      return (
+                        <tr
+                          key={log.id}
+                          className="border-b border-gray-200 bg-white"
+                        >
+                          <td className="py-3 px-4 align-middle text-gray-800">
+                            {log.filename}
+                          </td>
 
-                        <td className="py-3 px-4 align-middle text-gray-700">
-                          {log.year ?? "-"}
-                        </td>
-                        <td className="py-3 px-4 align-middle text-gray-700">
-                          {log.uploadedAt}
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="py-3 px-4 align-middle text-center">
+                            <span
+                              className={[
+                                "inline-flex justify-center rounded-full px-2.5 py-0.5 text-[11px] font-medium border",
+                                log.type === "hard"
+                                  ? "bg-blue-50 text-blue-700 border-blue-100"
+                                  : log.type === "soft"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                                  : "bg-zinc-100 text-zinc-700 border-zinc-200",
+                              ].join(" ")}
+                            >
+                              {typeLabel(log.type)}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 align-middle text-gray-700">
+                            {log.year ?? "-"}
+                          </td>
+                          <td className="py-3 px-4 align-middle text-gray-700">
+                            {log.uploadedAt}
+                          </td>
+
+                          <td className="py-3 px-4 align-middle text-center">
+                            <span
+                              className={[
+                                "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium border",
+                                isCanceled
+                                  ? "bg-red-50 text-red-700 border-red-100"
+                                  : "bg-zinc-50 text-zinc-700 border-zinc-200",
+                              ].join(" ")}
+                            >
+                              {isCanceled ? "Dibatalkan" : "Aktif"}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 align-middle text-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={!canCancel || cancelMutation.isPending}
+                              onClick={() => openCancelConfirm(log)}
+                            >
+                              Batalkan
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
 
-                {/* Pagination di luar tabel, seperti di gambar */}
                 {totalItems > 0 && (
                   <div className="mt-4 flex items-center justify-between">
                     <span className="text-xs text-zinc-600">
                       Halaman{" "}
-                      <span className="font-semibold">{safeCurrentPage}</span>{" "}
-                      dari <span className="font-semibold">{totalPages}</span>
+                      <span className="font-semibold">{safeCurrentPage}</span> dari{" "}
+                      <span className="font-semibold">{totalPages}</span>
                     </span>
 
                     <div className="flex items-center gap-2">
