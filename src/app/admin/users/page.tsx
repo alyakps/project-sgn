@@ -20,6 +20,7 @@ import {
   apiAdminResetKaryawanPassword,
   apiAdminImportKaryawan,
   apiAdminDeleteKaryawan, // ✅ FIX: pakai helper delete by NIK
+  apiGetMasterUnitKerja, // ✅ ADD: ambil unit kerja (dynamic dari DB)
 } from "@/lib/api";
 
 import {
@@ -60,6 +61,10 @@ const AdminUsersPage: React.FC = () => {
 
   const [search, setSearch] = React.useState<string>("");
 
+  // ✅ filter unit kerja (baru)
+  const [unitKerja, setUnitKerja] = React.useState<string>("All");
+  const [unitKerjaOptions, setUnitKerjaOptions] = React.useState<string[]>([]);
+
   // reset password
   const [loadingResetUserId, setLoadingResetUserId] =
     React.useState<number | null>(null);
@@ -83,6 +88,21 @@ const AdminUsersPage: React.FC = () => {
   const safeCurrentPage = meta?.current_page ?? 1;
   const totalPages = meta?.last_page ?? 1;
 
+  // ✅ load master unit kerja (dynamic dari DB)
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
+
+        const list = await apiGetMasterUnitKerja(token);
+        setUnitKerjaOptions(list);
+      } catch (e) {
+        setUnitKerjaOptions([]);
+      }
+    })();
+  }, []);
+
   const loadUsers = React.useCallback(
     async (page: number = 1) => {
       try {
@@ -96,6 +116,8 @@ const AdminUsersPage: React.FC = () => {
           page,
           per_page: 10,
           q: search,
+          // ✅ kirim filter unit kerja
+          unit_kerja: unitKerja === "All" ? "" : unitKerja,
         });
 
         setUsers(res.items);
@@ -109,7 +131,7 @@ const AdminUsersPage: React.FC = () => {
         setLoadingData(false);
       }
     },
-    [search],
+    [search, unitKerja],
   );
 
   React.useEffect(() => {
@@ -126,7 +148,6 @@ const AdminUsersPage: React.FC = () => {
       const token = getToken();
       if (!token) throw new Error("Token tidak ditemukan. Silakan login ulang.");
 
-      // ✅ FIX DI SINI: user.id (number) → user.nik (string)
       const res = await apiAdminResetKaryawanPassword(token, user.nik);
 
       setLastResetUser(user);
@@ -150,7 +171,6 @@ const AdminUsersPage: React.FC = () => {
       const token = getToken();
       if (!token) throw new Error("Token tidak ditemukan. Silakan login ulang.");
 
-      // ✅ FIX: gunakan helper -> endpoint delete by NIK
       await apiAdminDeleteKaryawan(token, user.nik);
 
       await loadUsers(safeCurrentPage);
@@ -238,13 +258,31 @@ const AdminUsersPage: React.FC = () => {
         <h1 className="text-xl font-semibold tracking-tight">Manajemen User</h1>
 
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="w-full sm:w-64">
-            <Input
-              placeholder="Cari NIK / Nama / Email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-9"
-            />
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <div className="w-full sm:w-64">
+              <Input
+                placeholder="Cari NIK / Nama / Email..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9"
+              />
+            </div>
+
+            {/* ✅ FILTER UNIT KERJA */}
+            <div className="w-full sm:w-72">
+              <select
+                value={unitKerja}
+                onChange={(e) => setUnitKerja(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="All">Semua Unit Kerja</option>
+                {unitKerjaOptions.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto">

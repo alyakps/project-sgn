@@ -231,7 +231,7 @@ export type AdminKaryawanMeta = {
  */
 export async function apiAdminListKaryawan(
   token: string,
-  params?: { page?: number; per_page?: number; q?: string }
+  params?: { page?: number; per_page?: number; q?: string; unit_kerja?: string }
 ): Promise<{ items: AdminKaryawan[]; meta: AdminKaryawanMeta }> {
   const url = new URL(`${API_URL}/api/admin/karyawan`);
 
@@ -240,6 +240,11 @@ export async function apiAdminListKaryawan(
   if (params?.page) url.searchParams.set("page", String(params.page));
   if (params?.q && params.q.trim() !== "") {
     url.searchParams.set("q", params.q.trim());
+  }
+
+  // ✅ tambahan: filter unit kerja
+  if (params?.unit_kerja && params.unit_kerja.trim() !== "") {
+    url.searchParams.set("unit_kerja", params.unit_kerja.trim());
   }
 
   const res = await fetch(url.toString(), {
