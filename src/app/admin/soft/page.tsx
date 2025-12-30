@@ -14,6 +14,9 @@ import {
 } from "@/components/ui/select";
 import { Info } from "lucide-react";
 import { getToken, getUser, clearAuth } from "@/lib/auth-storage";
+import { apiGetMasterUnitKerja } from "@/lib/api";
+
+/* ====================== TYPES ====================== */
 
 type EmployeeRow = {
   id: string;
@@ -29,15 +32,22 @@ type ApiMeta = {
   last_page: number;
 };
 
+/* ====================== API CONFIG ====================== */
+
 const API_BASE_URL =
   (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000")
     .replace(/\/$/, "") + "/api";
+
+/* ====================== PAGE ====================== */
 
 export default function AdminSoftPage() {
   const router = useRouter();
 
   const [search, setSearch] = React.useState("");
   const [unitFilter, setUnitFilter] = React.useState<string>("all");
+
+  const [unitOptions, setUnitOptions] = React.useState<string[]>([]);
+  const [loadingUnits, setLoadingUnits] = React.useState(false);
 
   const [employees, setEmployees] = React.useState<EmployeeRow[]>([]);
   const [meta, setMeta] = React.useState<ApiMeta | null>(null);
@@ -46,6 +56,7 @@ export default function AdminSoftPage() {
   const [loadingData, setLoadingData] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  /* ========== CEK AUTH (ADMIN) ========== */
   React.useEffect(() => {
     const token = getToken();
     const user = getUser();
@@ -59,6 +70,41 @@ export default function AdminSoftPage() {
     setLoadingAuth(false);
   }, [router]);
 
+  /* ========== LOAD MASTER UNIT KERJA ========== */
+  React.useEffect(() => {
+    if (loadingAuth) return;
+
+    const run = async () => {
+      const token = getToken();
+      if (!token) return;
+
+      setLoadingUnits(true);
+      try {
+        const list = await apiGetMasterUnitKerja(token);
+
+        // sanitize ringan: trim, remove empty, unique, sort
+        const clean = Array.from(
+          new Set(
+            (list ?? [])
+              .map((x) => String(x ?? "").trim())
+              .filter((x) => x.length > 0)
+          )
+        ).sort((a, b) => a.localeCompare(b));
+
+        setUnitOptions(clean);
+      } catch (e) {
+        console.error(e);
+        // kalau gagal fetch master, dropdown tetap usable dengan "Semua Unit"
+        setUnitOptions([]);
+      } finally {
+        setLoadingUnits(false);
+      }
+    };
+
+    run();
+  }, [loadingAuth]);
+
+  /* ========== LOAD DATA (SERVER-SIDE SEARCH + FILTER + PAGINATION) ========== */
   const loadEmployees = React.useCallback(
     async (page: number = 1, q?: string, unitKerja?: string) => {
       const token = getToken();
@@ -121,12 +167,14 @@ export default function AdminSoftPage() {
     []
   );
 
+  // load pertama
   React.useEffect(() => {
     if (!loadingAuth) {
       loadEmployees(1, "", "all");
     }
   }, [loadingAuth, loadEmployees]);
 
+  // reload ketika search/unit berubah
   React.useEffect(() => {
     if (loadingAuth) return;
 
@@ -178,13 +226,27 @@ export default function AdminSoftPage() {
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-zinc-600">Unit Kerja:</span>
-          <div className="w-48">
-            <Select value={unitFilter} onValueChange={(val) => setUnitFilter(val)}>
+          <div className="w-56">
+            <Select value={unitFilter} onValueChange={setUnitFilter}>
               <SelectTrigger className="h-9 text-xs">
                 <SelectValue placeholder="Semua unit kerja" />
               </SelectTrigger>
+
               <SelectContent>
                 <SelectItem value="all">Semua Unit</SelectItem>
+
+                {loadingUnits && (
+                  <SelectItem value="__loading" disabled>
+                    Memuat unit kerja...
+                  </SelectItem>
+                )}
+
+                {!loadingUnits &&
+                  unitOptions.map((u) => (
+                    <SelectItem key={u} value={u}>
+                      {u}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -202,6 +264,7 @@ export default function AdminSoftPage() {
               <th className="py-3 px-2 text-center w-[110px]">Detail</th>
             </tr>
           </thead>
+
           <tbody>
             {employees.length === 0 && !loadingData && (
               <tr>
@@ -224,14 +287,20 @@ export default function AdminSoftPage() {
               return (
                 <tr
                   key={emp.id}
-                  className={`border-b transition ${idx % 2 === 0 ? "bg-white" : "bg-zinc-50/70"}`}
+                  className={`border-b transition ${
+                    idx % 2 === 0 ? "bg-white" : "bg-zinc-50/70"
+                  }`}
                 >
                   <td className="py-3 px-2 text-center align-middle">{no}</td>
+
                   <td className="py-3 px-2 align-middle text-zinc-800 whitespace-nowrap">
                     {emp.nik}
                   </td>
+
                   <td className="py-3 px-2 align-middle text-zinc-900">{emp.nama}</td>
+
                   <td className="py-3 px-2 align-middle text-zinc-700">{emp.unitKerja}</td>
+
                   <td className="py-3 px-2 text-center align-middle">
                     <Button
                       size="sm"

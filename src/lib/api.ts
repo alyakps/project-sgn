@@ -402,28 +402,39 @@ export async function apiAdminDeleteKaryawan(token: string, nik: string) {
  */
 export async function apiAdminImportKaryawan(token: string, file: File) {
   const formData = new FormData();
-  // pastikan nama field "file" sama dengan yang diterima AdminController@importKaryawan
   formData.append("file", file);
 
   const res = await fetch(`${API_URL}/api/admin/import-karyawan`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
-      // Jangan set Content-Type manual, biar browser yang set boundary multipart
     },
     body: formData,
   });
 
   const json = await res.json().catch(() => ({} as any));
 
-  if (!res.ok) {
+  /**
+   * ✅ IMPORTANT:
+   * Backend bisa balikin 422 untuk "partial success" (ada baris gagal),
+   * tapi tetap ada data sukses yang masuk.
+   * Jadi jangan throw kalau message-nya "Proses import selesai."
+   */
+  const message = String(json?.message ?? "");
+  const isImportFinished = message.toLowerCase().includes("proses import selesai");
+
+  if (!res.ok && !isImportFinished) {
     const msg =
       json.message ||
       "Gagal mengimpor karyawan. Pastikan format file sudah sesuai.";
     throw new Error(msg);
   }
 
-  return json;
+  return {
+    ok: res.ok,              // true jika 200, false jika 422
+    status: res.status,      // 200 / 422
+    ...json,                 // message, sukses, gagal, row_errors, import_log_id, dll
+  };
 }
 
 /* ====================== MASTER DATA ====================== */
