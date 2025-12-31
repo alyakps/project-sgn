@@ -179,6 +179,7 @@ function SoftCompetencyChart({
         label: d.nama_kompetensi,
         value: d.your_score,
         avg: d.avg_employee_score ?? 0,
+        standard: 75, // ✅ Standard score khusus SOFT
         your_level: d.your_level,
         avg_level: d.avg_level,
       })),
@@ -214,6 +215,14 @@ function SoftCompetencyChart({
                 stroke="#2563eb"
                 fill="#2563eb"
                 fillOpacity={0.15}
+              />
+              {/* ✅ Radar Standard Score (75) warna kuning */}
+              <Radar
+                name="Standard Score"
+                dataKey="standard"
+                stroke="#facc15"
+                fill="#facc15"
+                fillOpacity={0.12}
               />
               <Legend
                 verticalAlign="top"
